@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import './index.css'
 import SplashScreen from './components/SplashScreen.tsx'
-import HostScreen from './components/HostScreen.tsx'
-import JoinScreen from './components/JoinScreen.tsx'
+import Lobby from './components/Lobby.tsx'
+import Join from './mobile/Join.tsx'
 
 const router = createBrowserRouter([
   {
@@ -13,11 +13,11 @@ const router = createBrowserRouter([
   },
   {
     path: "/host",
-    element: <HostScreen />,
+    element: <Lobby />,
   },
   {
     path: "/join",
-    element: <JoinScreen />,
+    element: <Join />,
   },
 ])
 
