@@ -2,10 +2,15 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import './index.css'
+import SplashScreen from './components/SplashScreen.tsx'
 import HostScreen from './components/HostScreen.tsx'
 import JoinScreen from './components/JoinScreen.tsx'
 
 const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <SplashScreen />,
+  },
   {
     path: "/host",
     element: <HostScreen />,
