@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { broadcast } from '../lib/orchestrator'
+import { broadcast, computeCategoryIntersection } from '../lib/orchestrator'
 
 const CATEGORIES = [
   {
@@ -29,6 +29,7 @@ interface CategoryOptInProps {
 export default function CategoryOptIn({ playerId, roomId, onComplete }: CategoryOptInProps) {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [categoriesLocked, setCategoriesLocked] = useState<number>(0)
 
   const loadExistingSelections = useCallback(async () => {
     try {
@@ -51,10 +52,20 @@ export default function CategoryOptIn({ playerId, roomId, onComplete }: Category
     }
   }, [playerId])
 
-  // Load existing selections on mount
+  const loadCategoryIntersection = useCallback(async () => {
+    try {
+      const intersection = await computeCategoryIntersection(roomId)
+      setCategoriesLocked(intersection.length)
+    } catch (error) {
+      console.error('Error loading category intersection:', error)
+    }
+  }, [roomId])
+
+  // Load existing selections and intersection on mount
   useEffect(() => {
     loadExistingSelections()
-  }, [playerId, loadExistingSelections])
+    loadCategoryIntersection()
+  }, [playerId, loadExistingSelections, loadCategoryIntersection])
 
   const toggleCategory = (categoryId: string) => {
     setSelectedCategories(prev => {
@@ -90,6 +101,9 @@ export default function CategoryOptIn({ playerId, roomId, onComplete }: Category
       } catch (e) {
         console.warn('categories:update broadcast failed', e)
       }
+
+      // Refresh intersection after saving
+      await loadCategoryIntersection()
 
       onComplete?.()
     } catch (error) {
@@ -147,9 +161,17 @@ export default function CategoryOptIn({ playerId, roomId, onComplete }: Category
         </div>
 
         <div className="mt-6 pt-4 border-t border-gray-200">
-          <p className="text-xs text-gray-500 text-center mb-4">
-            Selected: {selectedCategories.length} of {CATEGORIES.length}
-          </p>
+          <div className="text-center mb-4 space-y-2">
+            <p className="text-xs text-gray-500">
+              Selected: <span className="font-semibold">{selectedCategories.length}</span> of {CATEGORIES.length}
+            </p>
+            <p className="text-xs text-blue-600">
+              Shared by all players: <span className="font-bold">{categoriesLocked}</span> categories
+            </p>
+            <p className="text-xs text-gray-400">
+              Only shared categories will be used in the game
+            </p>
+          </div>
           <button
             onClick={saveSelections}
             disabled={isSubmitting || selectedCategories.length === 0}

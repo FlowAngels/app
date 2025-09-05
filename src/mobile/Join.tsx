@@ -3,6 +3,10 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { joinRoom, broadcast } from '../lib/orchestrator'
 import { supabase } from '../lib/supabase'
 import CategoryOptIn from './CategoryOptIn'
+import Respond from './Respond'
+import GuessVote from './GuessVote'
+import { subscribeToRoom, unsubscribeFromRoom } from '../lib/orchestrator'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 const COLORS = [
   { name: 'Red', value: '🔴', hex: '#ef4444' },
@@ -26,6 +30,9 @@ export default function Join() {
   const [success, setSuccess] = useState('')
   const [leftRoomId, setLeftRoomId] = useState<string | null>(null)
   const [takenColors, setTakenColors] = useState<string[]>([])
+  const [phase, setPhase] = useState<'idle' | 'respond' | 'ready' | 'guessvote'>('idle')
+  const [revealItems, setRevealItems] = useState<{ id: string; text: string }[]>([])
+  const [voteDeadline, setVoteDeadline] = useState<string | undefined>(undefined)
 
   // Mark player as disconnected if they close the tab unexpectedly
   useEffect(() => {
@@ -90,6 +97,27 @@ export default function Join() {
       fetchTakenColors()
     }
   }, [roomId, fetchTakenColors])
+
+  // Subscribe to round:start to flip into Respond phase
+  useEffect(() => {
+    if (!roomId) return
+    const ch = subscribeToRoom(roomId, (payload) => {
+      const p: any = payload
+      if (p?.event === 'round:start') {
+        setPhase('respond')
+      }
+      if (p?.event === 'round:reveal') {
+        setRevealItems(p.payload?.items || [])
+        setPhase('guessvote')
+      }
+      if (p?.event === 'round:vote_start') {
+        setVoteDeadline(p.payload?.voteDeadline)
+      }
+    })
+    return () => {
+      if (ch) unsubscribeFromRoom(ch)
+    }
+  }, [roomId])
 
   const handleJoin = async () => {
     if (!roomId || !name.trim()) {
@@ -186,6 +214,15 @@ export default function Join() {
   }
 
   if (success === 'categories_selected') {
+    // If a round is already active, render Respond; otherwise show waiting screen until round:start
+    if (phase === 'respond') {
+      const playerId = localStorage.getItem('playerId')!
+      return <Respond roomId={roomId!} playerId={playerId} />
+    }
+    if (phase === 'guessvote') {
+      const playerId = localStorage.getItem('playerId')!
+      return <GuessVote roomId={roomId!} playerId={playerId} items={revealItems} voteDeadline={voteDeadline} />
+    }
     return (
       <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
         <div className="text-center">
