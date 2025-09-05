@@ -4,7 +4,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 
 export default function HostScreen() {
   const [messages, setMessages] = useState<string[]>([])
-  const [channel, setChannel] = useState<RealtimeChannel | null>(null)
+  const [, setChannel] = useState<RealtimeChannel | null>(null)
 
   useEffect(() => {
     // Subscribe to room updates for testing

@@ -1,4 +1,49 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+import { createRoom } from '../lib/orchestrator'
+
 export default function SplashScreen() {
+  const navigate = useNavigate()
+  const [canResume, setCanResume] = useState(false)
+  const [latestRoomId, setLatestRoomId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const init = async () => {
+      // Stable host device id
+      let hostDeviceId = localStorage.getItem('hostDeviceId')
+      if (!hostDeviceId) {
+        hostDeviceId = 'host-' + Math.random().toString(36).slice(2, 11)
+        localStorage.setItem('hostDeviceId', hostDeviceId)
+      }
+
+      // If a current room is cached, allow resume immediately
+      const cached = localStorage.getItem('currentRoomId')
+      if (cached) {
+        setCanResume(true)
+        setLatestRoomId(cached)
+        return
+      }
+
+      // Otherwise, look up recent rooms for this device (not ended, <30m old)
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('id,status,created_at')
+        .eq('host_device_id', hostDeviceId)
+        .neq('status', 'ended')
+        .order('created_at', { ascending: false })
+        .limit(5)
+      if (error) return
+      const now = Date.now()
+      const fresh = (data || []).filter(r => (now - new Date(r.created_at).getTime()) < 30 * 60 * 1000)
+      if (fresh.length > 0) {
+        setCanResume(true)
+        setLatestRoomId(fresh[0].id)
+      }
+    }
+    init()
+  }, [])
+
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{
       background: 'radial-gradient(ellipse at center, #0f172a 0%, #1e293b 30%, #0f172a 70%, #000 100%)',
@@ -248,6 +293,41 @@ export default function SplashScreen() {
           Submit snappy answers, spot the round owner,<br />
           vote your favorites. Two champions, endless<br />
           laughs.
+        </div>
+
+        {/* Primary Actions */}
+        <div className="mt-10 flex items-center justify-center gap-4">
+          <button
+            onClick={async () => {
+              // Ensure device id
+              let hostDeviceId = localStorage.getItem('hostDeviceId')
+              if (!hostDeviceId) {
+                hostDeviceId = 'host-' + Math.random().toString(36).slice(2, 11)
+                localStorage.setItem('hostDeviceId', hostDeviceId)
+              }
+              const { id } = await createRoom(hostDeviceId)
+              localStorage.setItem('currentRoomId', id)
+              navigate(`/host?room=${id}&hostJoin=1`)
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg text-xl font-semibold"
+          >
+            Create Game
+          </button>
+          {canResume && (
+            <button
+              onClick={() => {
+                if (latestRoomId) {
+                  localStorage.setItem('currentRoomId', latestRoomId)
+                  navigate(`/host?room=${latestRoomId}`)
+                } else {
+                  navigate('/host')
+                }
+              }}
+              className="bg-gray-600 hover:bg-gray-700 text-white px-8 py-3 rounded-lg text-xl font-semibold"
+            >
+              Resume Room
+            </button>
+          )}
         </div>
       </div>
     </div>
