@@ -222,58 +222,40 @@ export default function SplashScreen() {
 
         {/* Game Info Badges */}
         <div className="flex justify-center items-center" style={{gap: '2rem', marginBottom: '4rem'}}>
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(245, 158, 11, 0.25) 100%)',
-            border: '2px solid rgba(251, 191, 36, 0.3)',
-            borderRadius: '50px',
-            padding: '1rem 2rem',
-            backdropFilter: 'blur(10px)',
-            boxShadow: '0 8px 32px rgba(251, 191, 36, 0.1)'
-          }}>
+          <div>
             <span style={{
               color: '#fbbf24',
               fontWeight: '600',
               fontSize: '1.25rem',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
+              gap: '0.5rem',
+              textShadow: '0 0 10px #fbbf24, 0 0 20px #fbbf24'
             }}>
               🎉 Party
             </span>
           </div>
 
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(16, 185, 129, 0.25) 100%)',
-            border: '2px solid rgba(34, 197, 94, 0.3)',
-            borderRadius: '50px',
-            padding: '1rem 2rem',
-            backdropFilter: 'blur(10px)',
-            boxShadow: '0 8px 32px rgba(34, 197, 94, 0.1)'
-          }}>
+          <div>
             <span style={{
               color: '#10b981',
               fontWeight: '600',
-              fontSize: '1.25rem'
+              fontSize: '1.25rem',
+              textShadow: '0 0 10px #10b981, 0 0 20px #10b981'
             }}>
               1–8 players
             </span>
           </div>
 
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.25) 100%)',
-            border: '2px solid rgba(59, 130, 246, 0.3)',
-            borderRadius: '50px',
-            padding: '1rem 2rem',
-            backdropFilter: 'blur(10px)',
-            boxShadow: '0 8px 32px rgba(59, 130, 246, 0.1)'
-          }}>
+          <div>
             <span style={{
               color: '#3b82f6',
               fontWeight: '600',
               fontSize: '1.25rem',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
+              gap: '0.5rem',
+              textShadow: '0 0 10px #3b82f6, 0 0 20px #3b82f6'
             }}>
               ⏰ 15 min
             </span>
@@ -296,7 +278,7 @@ export default function SplashScreen() {
         </div>
 
         {/* Primary Actions */}
-        <div className="mt-10 flex items-center justify-center gap-4">
+        <div className="flex items-center justify-center" style={{marginTop: '2.5rem', gap: '3rem'}}>
           <button
             onClick={async () => {
               // Ensure device id
@@ -306,12 +288,24 @@ export default function SplashScreen() {
                 localStorage.setItem('hostDeviceId', hostDeviceId)
               }
               const { id } = await createRoom(hostDeviceId)
+              // Clear any stale host player mapping from a previous room
+              localStorage.removeItem('hostPlayerId')
               localStorage.setItem('currentRoomId', id)
               navigate(`/lobby?room=${id}&hostJoin=1`)
             }}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg text-xl font-semibold"
+            style={{
+              backgroundColor: 'rgba(255, 20, 147, 0.3)',
+              color: 'white',
+              padding: '12px 20px',
+              borderRadius: '8px',
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              border: '2px solid #ff1493'
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 20, 147, 0.5)'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255, 20, 147, 0.3)'}
           >
-            Create Game
+            NEW GAME!
           </button>
           {canResume && (
             <button
@@ -323,9 +317,19 @@ export default function SplashScreen() {
                   navigate('/lobby')
                 }
               }}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-8 py-3 rounded-lg text-xl font-semibold"
+              style={{
+                backgroundColor: 'rgba(0, 245, 255, 0.3)',
+                color: 'white',
+                padding: '12px 20px',
+                borderRadius: '8px',
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                border: '2px solid #00f5ff'
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 245, 255, 0.5)'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 245, 255, 0.3)'}
             >
-              Resume Room
+              Resume?
             </button>
           )}
         </div>
