@@ -102,11 +102,16 @@ export default function Join() {
       return
     }
 
+    // Normalize name capitalization (Title Case)
+    const toTitleCase = (s: string) => s.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    const properName = toTitleCase(name.trim())
+
     setIsJoining(true)
     setError('')
     
     try {
-      const result = await joinRoom(roomId, name.trim(), selectedColor.value)
+      const result = await joinRoom(roomId, properName, selectedColor.value)
+      setName(properName)
       // Store player info for category selection
       localStorage.setItem('playerId', result.playerId)
       localStorage.setItem('roomId', roomId)

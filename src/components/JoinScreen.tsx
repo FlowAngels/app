@@ -67,7 +67,7 @@ export default function JoinScreen() {
         </div>
       </div>
       <p className="text-gray-600 mt-4 text-center">
-        Click "Join Room" to test realtime updates on /host tab
+        Click "Join Room" to test realtime updates on /lobby tab
       </p>
     </div>
   )

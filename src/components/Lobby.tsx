@@ -63,7 +63,7 @@ export default function Lobby() {
       // Persist and reflect in URL for resume
       localStorage.setItem('currentRoomId', id)
       if (new URLSearchParams(window.location.search).get('room') !== id) {
-        navigate(`/host?room=${id}`, { replace: true })
+        navigate(`/lobby?room=${id}`, { replace: true })
       }
 
       setRoomId(id)
@@ -102,7 +102,7 @@ export default function Lobby() {
       const { id } = await createRoom(devId)
       setRoomId(id)
       localStorage.setItem('currentRoomId', id)
-      navigate(`/host?room=${id}`, { replace: true })
+      navigate(`/lobby?room=${id}`, { replace: true })
       
       // Show modal for host to join as player
       setShowHostJoinModal(true)
@@ -124,8 +124,12 @@ export default function Lobby() {
     setError('')
 
     try {
+      // Normalize host name capitalization (Title Case)
+      const toTitleCase = (s: string) => s.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      const properName = toTitleCase(hostName.trim())
+      setHostName(properName)
       // Join the room as the host player
-      const result = await joinRoom(roomId, hostName.trim(), hostColor.value)
+      const result = await joinRoom(roomId, properName, hostColor.value)
       setHostPlayerId(result.playerId)
       localStorage.setItem('hostPlayerId', result.playerId)
       
@@ -434,7 +438,12 @@ export default function Lobby() {
   return (
     <div className="min-h-screen bg-gray-900 p-8">
       <div className="max-w-4xl mx-auto text-center">
-        <h1 className="text-4xl font-bold text-white mb-4">Room: {roomId}</h1>
+        <h1 className="text-4xl font-bold text-white mb-1">Room: {roomId}</h1>
+        {expiresInSec != null && (
+          <div className="text-sm text-gray-400 mb-4">
+            Auto-deletes in {Math.floor(expiresInSec / 60)}:{String(expiresInSec % 60).padStart(2, '0')}
+          </div>
+        )}
         
         <div className="grid md:grid-cols-2 gap-8 mb-8">
           {/* QR Code */}
@@ -458,7 +467,7 @@ export default function Lobby() {
                 <div key={player.id} className="flex items-center space-x-3 p-3 bg-gray-700 rounded">
                   <span className="text-3xl">{player.avatar}</span>
                   <div className="flex-1">
-                    <span className="text-white font-medium text-lg">{player.name}</span>
+                    <span className="text-white font-medium text-lg capitalize">{player.name}</span>
                   </div>
                   {player.connected ? (
                     <span className="text-green-400 text-sm">● Online</span>
@@ -500,9 +509,6 @@ export default function Lobby() {
           </div>
         )}
         
-        <p className="text-gray-400">
-          {players.length < 3 ? `Need ${3 - players.length} more players to start` : 'Ready to start!'}
-        </p>
       </div>
     </div>
   )

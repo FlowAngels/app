@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import './index.css'
 import SplashScreen from './components/SplashScreen.tsx'
 import Lobby from './components/Lobby.tsx'
@@ -12,8 +12,12 @@ const router = createBrowserRouter([
     element: <SplashScreen />,
   },
   {
-    path: "/host",
+    path: "/lobby",
     element: <Lobby />,
+  },
+  {
+    path: "/host",
+    element: <Navigate to="/lobby" replace />,
   },
   {
     path: "/join",

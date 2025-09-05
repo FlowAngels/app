@@ -307,7 +307,7 @@ export default function SplashScreen() {
               }
               const { id } = await createRoom(hostDeviceId)
               localStorage.setItem('currentRoomId', id)
-              navigate(`/host?room=${id}&hostJoin=1`)
+              navigate(`/lobby?room=${id}&hostJoin=1`)
             }}
             className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg text-xl font-semibold"
           >
@@ -318,9 +318,9 @@ export default function SplashScreen() {
               onClick={() => {
                 if (latestRoomId) {
                   localStorage.setItem('currentRoomId', latestRoomId)
-                  navigate(`/host?room=${latestRoomId}`)
+                  navigate(`/lobby?room=${latestRoomId}`)
                 } else {
-                  navigate('/host')
+                  navigate('/lobby')
                 }
               }}
               className="bg-gray-600 hover:bg-gray-700 text-white px-8 py-3 rounded-lg text-xl font-semibold"
