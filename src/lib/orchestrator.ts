@@ -233,6 +233,7 @@ export async function deriveBoardState(roomId: string) {
   // Submission info for current round (if any)
   let submissionCount = 0
   let submittedPlayerIds: string[] = []
+  let currentSubmissions: { id: string; text: string; player_id: string }[] = []
   if (currentRound?.id) {
     const { count } = await supabase
       .from('submissions')
@@ -244,6 +245,11 @@ export async function deriveBoardState(roomId: string) {
       .select('player_id')
       .eq('round_id', currentRound.id)
     submittedPlayerIds = (submitted || []).map((s: any) => s.player_id)
+    const { data: subs } = await supabase
+      .from('submissions')
+      .select('id, text, player_id')
+      .eq('round_id', currentRound.id)
+    currentSubmissions = (subs || []) as any
   }
   
   // Sort players alphabetically by name (case-insensitive)
@@ -259,7 +265,8 @@ export async function deriveBoardState(roomId: string) {
     categoryPool,
     categoriesLocked: categoryPool.length,
     submissionCount,
-    submittedPlayerIds
+    submittedPlayerIds,
+    currentSubmissions
   }
 }
 
@@ -317,7 +324,7 @@ export async function startRound(roomId: string, opts?: { category?: string; pro
   // Get room and category pool
   const { data: room, error: roomErr } = await supabase
     .from('rooms')
-    .select('id, category_pool')
+    .select('id, category_pool, round_index')
     .eq('id', roomId)
     .single()
   if (roomErr || !room) throw new Error('Room not found')
@@ -325,13 +332,15 @@ export async function startRound(roomId: string, opts?: { category?: string; pro
   if (pool.length === 0 && !opts?.category) throw new Error('No categories available')
   const category = opts?.category || pool[0]
 
-  // Choose round owner randomly among connected players
+  // Choose round owner by rotation among connected players (sorted by name)
   const { data: pl } = await supabase
     .from('players')
-    .select('id')
+    .select('id,name')
     .eq('room_id', roomId)
     .eq('connected', true)
-  const ownerId = pl && pl.length > 0 ? pl[Math.floor(Math.random() * pl.length)].id : null
+  const sortedPl = (pl || []).slice().sort((a:any,b:any)=> (a?.name||'').localeCompare(b?.name||'', undefined, {sensitivity:'base'}))
+  const idx = Math.max(0, (room as any).round_index || 0) % Math.max(1, sortedPl.length || 1)
+  const ownerId = sortedPl.length > 0 ? sortedPl[idx].id : null
 
   // Insert round with 60s submission deadline
   const deadline = new Date(Date.now() + 60 * 1000).toISOString()
@@ -504,7 +513,7 @@ export async function finalizeRound(roomId: string): Promise<{ ownerAnswerId: st
   }
   await supabase
     .from('rooms')
-    .update({ leaderboards: lb, status: 'results' })
+    .update({ leaderboards: lb, status: 'results', round_index: ((room as any).round_index || 0) + 1 })
     .eq('id', roomId)
 
   await broadcast(roomId, 'round:results', { ownerAnswerId, correctGuessers, voteCounts })

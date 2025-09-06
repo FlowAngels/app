@@ -51,6 +51,7 @@ export default function Lobby() {
   const [hostName, setHostName] = useState('')
   const [hostColor, setHostColor] = useState({ name: 'Red', value: '🔴', hex: '#ef4444' })
   const [isJoiningAsHost, setIsJoiningAsHost] = useState(false)
+  const [roomStatus, setRoomStatus] = useState('lobby')
   const suppressResumeRef = useRef(false)
   
   // Ensure a stable host device id for this browser
@@ -95,6 +96,7 @@ export default function Lobby() {
         const boardState = await deriveBoardState(id)
         setPlayers(boardState.players)
         if (boardState.room?.created_at) {
+          
           setExpiresInSec(computeExpiry(boardState.room.created_at))
         }
         setSubmissionCount(boardState.submissionCount || 0)
@@ -151,6 +153,7 @@ export default function Lobby() {
       const initialState = await deriveBoardState(id)
       setPlayers(initialState.players)
       if (initialState.room?.created_at) {
+        
         setExpiresInSec(computeExpiry(initialState.room.created_at))
       }
       setSubmissionCount(initialState.submissionCount || 0)
@@ -380,72 +383,202 @@ export default function Lobby() {
   // Host Join Modal
   if (showHostJoinModal) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-8">
-        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-          <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">
-            Join Your Game
-          </h2>
-          <p className="text-gray-600 text-center mb-6">
-            Room <span className="font-bold text-blue-600">{roomId}</span> created! 
-            Enter your details to join as a player.
-          </p>
+      <div className="min-h-screen flex items-start justify-center px-4 py-8 relative overflow-hidden" style={{
+        background: 'radial-gradient(ellipse at center, #0f172a 0%, #1e293b 30%, #0f172a 70%, #000 100%)'
+      }}>
+        {/* Background emoji decorations - scaled for mobile */}
+        <div className="absolute top-8 left-6 text-4xl md:text-6xl opacity-20 md:opacity-30">🎭</div>
+        <div className="absolute top-16 right-6 text-5xl md:text-7xl opacity-15 md:opacity-25">⭐</div>
+        <div className="absolute bottom-32 left-6 text-4xl md:text-6xl opacity-15 md:opacity-20">🎪</div>
+        <div className="absolute bottom-8 right-6 text-6xl md:text-8xl opacity-10 md:opacity-15">😵</div>
+        
+        <div className="relative z-10 w-full max-w-sm mx-auto" style={{
+          background: 'rgba(15, 23, 42, 0.9)',
+          backdropFilter: 'blur(15px)',
+          padding: '32px 24px'
+        }}>
+          <style>{`
+            .host-name-input::placeholder {
+              color: #fbbf24 !important;
+              opacity: 0.9;
+              text-shadow: 0 0 8px #fbbf24;
+            }
+          `}</style>
+          <div className="text-center" style={{marginBottom: '4rem'}}>
+            <div className="font-medium mb-2" style={{
+              color: '#cbd5e1',
+              lineHeight: '1.3',
+              fontSize: '3rem'
+            }}>
+              Join your
+            </div>
+            <div className="mb-2" style={{
+              fontSize: '5rem',
+              fontWeight: '900',
+              lineHeight: '0.9',
+              letterSpacing: '0.02em'
+            }}>
+              {/* WHAT - Neon tube style */}
+              <span style={{
+                color: 'transparent',
+                WebkitTextStroke: '2px #00f5ff',
+                textShadow: `
+                  0 0 8px #00f5ff,
+                  0 0 16px #00f5ff,
+                  0 0 24px #00f5ff,
+                  0 0 32px #00f5ff,
+                  inset 0 0 8px #00f5ff
+                `,
+                filter: 'drop-shadow(0 0 16px #00f5ff)'
+              }}>WHAT</span>
+              {/* EVER! - Neon tube style */}
+              <span style={{
+                color: 'transparent',
+                WebkitTextStroke: '2px #ff1493',
+                textShadow: `
+                  0 0 8px #ff1493,
+                  0 0 16px #ff1493,
+                  0 0 24px #ff1493,
+                  0 0 32px #ff1493,
+                  inset 0 0 8px #ff1493
+                `,
+                filter: 'drop-shadow(0 0 16px #ff1493)'
+              }}>EVER!</span>
+            </div>
+            <div className="font-bold mb-4" style={{
+              color: '#cbd5e1',
+              fontSize: '2rem'
+            }}>
+              {roomId} game
+            </div>
+          </div>
           
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <div className="px-4 py-3 rounded mb-4" style={{
+              background: 'rgba(239, 68, 68, 0.2)',
+              border: '2px solid rgba(239, 68, 68, 0.5)',
+              color: '#fca5a5',
+              boxShadow: '0 0 15px rgba(239, 68, 68, 0.3)'
+            }}>
               {error}
             </div>
           )}
 
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">
-              Your Name
-            </label>
+          <div style={{marginBottom: '3rem'}}>
             <input
               type="text"
               value={hostName}
               onChange={(e) => setHostName(e.target.value)}
-              className="w-full px-3 py-3 border rounded-lg focus:outline-none focus:border-blue-500"
-              placeholder="Enter your name"
+              className="w-full px-6 py-4 rounded-xl focus:outline-none transition-all text-center host-name-input"
+              style={{
+                background: 'rgba(15, 23, 42, 0.9)',
+                border: '3px solid rgba(0, 245, 255, 0.4)',
+                color: '#fff',
+                fontSize: '1.25rem',
+                fontWeight: '500',
+                minHeight: '56px'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#00f5ff'
+                e.target.style.boxShadow = '0 0 20px rgba(0, 245, 255, 0.5)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = 'rgba(0, 245, 255, 0.4)'
+                e.target.style.boxShadow = 'none'
+              }}
+              placeholder="Enter Player Name"
               maxLength={20}
             />
           </div>
 
-          <div className="mb-6">
-            <label className="block text-gray-700 text-sm font-bold mb-2">
+          <div style={{marginBottom: '3rem'}}>
+            <label className="block font-bold text-center" style={{
+              color: '#fbbf24',
+              textShadow: '0 0 10px #fbbf24, 0 0 20px #fbbf24',
+              fontSize: '1.25rem',
+              marginBottom: '2rem'
+            }}>
               Choose Your Color
             </label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-3 mb-6">
               {COLORS.map((color) => (
                 <button
                   key={color.name}
                   onClick={() => setHostColor(color)}
-                  className={`p-3 text-2xl rounded-lg border-4 transition-all ${
-                    hostColor.name === color.name
-                      ? 'border-gray-800 bg-gray-100 scale-110'
-                      : 'border-gray-200 hover:border-gray-400'
-                  }`}
-                  style={{ borderColor: hostColor.name === color.name ? color.hex : undefined }}
+                  className="p-4 text-3xl transition-all transform active:scale-95" 
+                  style={{
+                    background: 'transparent',
+                    border: 'none'
+                  }}
                 >
-                  {color.value}
-                  <div className="text-xs text-gray-600 mt-1">{color.name}</div>
+                  <div className="mb-2" style={{
+                    textShadow: hostColor.name === color.name ? `0 0 15px ${color.hex}, 0 0 30px ${color.hex}` : 'none'
+                  }}>{color.value}</div>
+                  <div className="text-sm font-medium" style={{
+                    color: hostColor.name === color.name ? color.hex : '#cbd5e1',
+                    textShadow: hostColor.name === color.name ? `0 0 10px ${color.hex}, 0 0 20px ${color.hex}` : 'none'
+                  }}>{color.name}</div>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-5 mt-8">
             <button
               onClick={handleHostJoin}
               disabled={isJoiningAsHost || !hostName.trim()}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="w-full py-5 px-6 rounded-2xl font-bold text-lg transition-all active:scale-95"
+              style={{
+                backgroundColor: isJoiningAsHost || !hostName.trim() 
+                  ? 'rgba(107, 114, 128, 0.3)' 
+                  : 'rgba(255, 20, 147, 0.3)',
+                color: 'white',
+                border: isJoiningAsHost || !hostName.trim()
+                  ? '2px solid rgba(107, 114, 128, 0.3)'
+                  : '2px solid #ff1493',
+                cursor: isJoiningAsHost || !hostName.trim() ? 'not-allowed' : 'pointer',
+                minHeight: '64px'
+              }}
+              onMouseEnter={(e) => {
+                if (!isJoiningAsHost && hostName.trim()) {
+                  e.target.style.backgroundColor = 'rgba(255, 20, 147, 0.5)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isJoiningAsHost && hostName.trim()) {
+                  e.target.style.backgroundColor = 'rgba(255, 20, 147, 0.3)'
+                }
+              }}
             >
-              {isJoiningAsHost ? 'Joining...' : 'Join & Open Lobby'}
+              {isJoiningAsHost ? 'JOINING...' : 'JOIN & OPEN LOBBY!'}
             </button>
             
             <button
               onClick={handleSkipHostJoin}
               disabled={isJoiningAsHost}
-              className="w-full bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium disabled:opacity-50"
+              className="w-full py-4 px-6 rounded-2xl font-semibold text-base transition-all active:scale-95"
+              style={{
+                backgroundColor: isJoiningAsHost 
+                  ? 'rgba(107, 114, 128, 0.3)' 
+                  : 'rgba(0, 245, 255, 0.3)',
+                color: 'white',
+                border: isJoiningAsHost
+                  ? '2px solid rgba(107, 114, 128, 0.3)'
+                  : '2px solid #00f5ff',
+                opacity: isJoiningAsHost ? 0.5 : 1,
+                cursor: isJoiningAsHost ? 'not-allowed' : 'pointer',
+                minHeight: '56px'
+              }}
+              onMouseEnter={(e) => {
+                if (!isJoiningAsHost) {
+                  e.target.style.backgroundColor = 'rgba(0, 245, 255, 0.5)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isJoiningAsHost) {
+                  e.target.style.backgroundColor = 'rgba(0, 245, 255, 0.3)'
+                }
+              }}
             >
               Skip - Just Open Lobby
             </button>
@@ -552,21 +685,21 @@ export default function Lobby() {
                 <button
                   onClick={async () => {
                     try {
-                      if (players.length < 3) return
+                      if (players.length < 3 || categoriesLocked === 0) return
                       const opts = previewCategory && previewPrompt ? { category: previewCategory, promptText: previewPrompt } : undefined
                       await startRound(roomId, opts as any)
                     } catch (e) {
                       console.error('Failed to start round', e)
                     }
                   }}
-                  disabled={players.length < 3}
+                  disabled={players.length < 3 || categoriesLocked === 0}
                   className={`px-5 py-2 rounded font-semibold text-white ${
                     players.length < 3
                       ? 'bg-gray-600 cursor-not-allowed opacity-60'
                       : 'bg-green-600 hover:bg-green-700'
                   }`}
                 >
-                  {players.length < 3 ? `Need ${3 - players.length} more` : 'Start'}
+                  {players.length < 3 ? `Need ${3 - players.length} more` : (categoriesLocked === 0 ? 'Pick shared categories' : 'Start')}
                 </button>
               </div>
             ) : (
@@ -628,11 +761,31 @@ export default function Lobby() {
                 ))}
                 {players.length === 0 && (<p className="text-gray-400">Waiting for players to join...</p>)}
               </div>
-              {players.length < 3 ? (
-                <button className="mt-4 bg-gray-500 text-gray-300 px-6 py-2 rounded font-semibold cursor-not-allowed" disabled>
-                  Need {3 - players.length} more players
-                </button>
-              ) : null}
+              <div className="mt-4 flex items-center justify-end">
+                {players.length < 3 ? (
+                  <button className="bg-gray-500 text-gray-300 px-6 py-2 rounded font-semibold cursor-not-allowed" disabled>
+                    Need {3 - players.length} more
+                  </button>
+                ) : categoriesLocked === 0 ? (
+                  <button className="bg-gray-500 text-gray-300 px-6 py-2 rounded font-semibold cursor-not-allowed" disabled>
+                    Pick shared categories
+                  </button>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const opts = previewCategory && previewPrompt ? { category: previewCategory, promptText: previewPrompt } : undefined
+                        await startRound(roomId, opts as any)
+                      } catch (e) {
+                        console.error('Failed to start round', e)
+                      }
+                    }}
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded font-semibold"
+                  >
+                    Start
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}

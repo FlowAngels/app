@@ -45,16 +45,8 @@ export default function GuessVote({ roomId, playerId, items, voteDeadline }: Gue
     return () => clearInterval(t)
   }, [voteDeadline])
 
-  const toggleVote = (id: string) => {
-    setVotesState(prev => {
-      const next = [...prev]
-      // allow duplicates; cap at 2
-      if (next.length < 2) next.push(id)
-      else next[1] = id
-      return next
-    })
-  }
-
+  const addVote = (id: string) => setVotesState(prev => prev.length < 2 ? [...prev, id] : [prev[0], id])
+  const clearVotes = () => setVotesState([])
   const selectGuess = (id: string) => setGuessId(id)
 
   useEffect(() => {
@@ -77,37 +69,38 @@ export default function GuessVote({ roomId, playerId, items, voteDeadline }: Gue
           <div className="text-center text-sm text-gray-600 mb-3">Time left: {secondsLeft}s</div>
         )}
         <div className="space-y-3">
-          {items.map(item => (
-            <button
-              key={item.id}
-              onClick={() => toggleVote(item.id)}
-              onDoubleClick={() => toggleVote(item.id)}
-              onPointerDown={(e) => {
-                // long-press detection (~500ms)
-                const target = e.currentTarget as any
-                target.__lp = setTimeout(() => selectGuess(item.id), 500)
-              }}
-              onPointerUp={(e) => {
-                const target = e.currentTarget as any
-                if (target.__lp) clearTimeout(target.__lp)
-              }}
-              disabled={ownIds.has(item.id)}
-              className={`w-full p-4 rounded-xl border-2 text-left ${
-                guessId === item.id ? 'border-purple-600 bg-purple-50' : 'border-gray-200 bg-white'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-gray-800">{item.text}</p>
-                </div>
-                <div className="text-xs text-gray-500 ml-3">
-                  {ownIds.has(item.id) ? '—' : `${votes.filter(v => v === item.id).length}★`} {guessId === item.id ? '👤' : ''}
+          {items.map(item => {
+            const isOwn = ownIds.has(item.id)
+            const voteCount = votes.filter(v => v === item.id).length
+            const isGuess = guessId === item.id
+            return (
+              <div key={item.id} className={`w-full p-4 rounded-xl border-2 ${isGuess ? 'border-purple-600 bg-purple-50' : 'border-gray-200 bg-white'}`}>
+                <div className="text-gray-800 mb-3">{item.text}</div>
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                  <button
+                    disabled={isOwn}
+                    onClick={() => selectGuess(item.id)}
+                    className={`px-3 py-1 rounded ${isOwn ? 'bg-gray-200 text-gray-400' : isGuess ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
+                  >
+                    {isGuess ? 'Guessed 👤' : 'Guess 👤'}
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      disabled={isOwn || votes.length >= 2}
+                      onClick={() => addVote(item.id)}
+                      className={`px-3 py-1 rounded ${isOwn || votes.length >= 2 ? 'bg-gray-200 text-gray-400' : 'bg-yellow-100 hover:bg-yellow-200'}`}
+                    >
+                      Vote ★
+                    </button>
+                    <span className="text-gray-500">{isOwn ? '—' : `${voteCount}★`}</span>
+                  </div>
                 </div>
               </div>
-            </button>
-          ))}
+            )
+          })}
         </div>
-        <p className="text-xs text-gray-500 mt-3 text-center">Double‑tap to vote (2 total). Long‑press to guess the owner. You can change until time’s up.</p>
+        <div className="mt-3 text-center text-xs text-gray-500">Votes left: {Math.max(0, 2 - votes.length)} {votes.length > 0 && (<button onClick={clearVotes} className="ml-2 underline">Clear</button>)}</div>
+        <p className="text-xs text-gray-500 mt-3 text-center">Tap Guess (👤) and Vote (★). You can change until time's up.</p>
       </div>
     </div>
   )

@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import CategoryOptIn from './CategoryOptIn'
 import Respond from './Respond'
 import GuessVote from './GuessVote'
+import Results from './Results'
 import { subscribeToRoom, unsubscribeFromRoom } from '../lib/orchestrator'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -30,7 +31,7 @@ export default function Join() {
   const [success, setSuccess] = useState('')
   const [leftRoomId, setLeftRoomId] = useState<string | null>(null)
   const [takenColors, setTakenColors] = useState<string[]>([])
-  const [phase, setPhase] = useState<'idle' | 'respond' | 'ready' | 'guessvote'>('idle')
+  const [phase, setPhase] = useState<'idle' | 'respond' | 'ready' | 'guessvote' | 'results'>('idle')
   const [revealItems, setRevealItems] = useState<{ id: string; text: string }[]>([])
   const [voteDeadline, setVoteDeadline] = useState<string | undefined>(undefined)
 
@@ -113,6 +114,9 @@ export default function Join() {
       if (p?.event === 'round:vote_start') {
         setVoteDeadline(p.payload?.voteDeadline)
       }
+      if (p?.event === 'round:results') {
+        setPhase('results')
+      }
     })
     return () => {
       if (ch) unsubscribeFromRoom(ch)
@@ -179,6 +183,14 @@ export default function Join() {
     }
   }
 
+
+  // Host/Player toggle (if this device is also host)
+  const hostPid = typeof window !== 'undefined' ? localStorage.getItem('hostPlayerId') : null
+  const toggleToHost = () => {
+    if (!roomId) return
+    window.location.href = `/lobby?room=${roomId}`
+  }
+
   if (!roomId) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
@@ -222,6 +234,10 @@ export default function Join() {
     if (phase === 'guessvote') {
       const playerId = localStorage.getItem('playerId')!
       return <GuessVote roomId={roomId!} playerId={playerId} items={revealItems} voteDeadline={voteDeadline} />
+    }
+    if (phase === 'results') {
+      const playerId = localStorage.getItem('playerId')!
+      return <Results roomId={roomId!} playerId={playerId} />
     }
     return (
       <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
@@ -311,6 +327,7 @@ export default function Join() {
           {isJoining ? 'Joining...' : 'Join Game'}
         </button>
       </div>
+      {hostPid && (<button onClick={toggleToHost} className="fixed bottom-4 right-4 bg-gray-800 text-white px-3 py-2 rounded shadow">Host View</button>)}
     </div>
   )
 }
