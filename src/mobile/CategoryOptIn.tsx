@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { broadcast, computeCategoryIntersection } from '../lib/orchestrator'
+import { parseStringArray } from '../lib/gameState'
 
 const CATEGORIES = [
   {
@@ -44,9 +45,7 @@ export default function CategoryOptIn({ playerId, roomId, onComplete }: Category
         return
       }
 
-      if (data?.selected_categories && Array.isArray(data.selected_categories)) {
-        setSelectedCategories(data.selected_categories)
-      }
+      setSelectedCategories(parseStringArray(data?.selected_categories))
     } catch (error) {
       console.error('Error loading category selections:', error)
     }

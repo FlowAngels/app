@@ -5,8 +5,8 @@ the game; 3–8 players use their phones to answer, identify the round owner's
 answer, and vote for a favourite.
 
 This repository compiles, but it is not yet a complete MVP. Read
-[`../docs/PROJECT_STATE.md`](../docs/PROJECT_STATE.md) before working on it and
-[`../docs/REVIVAL_PLAN.md`](../docs/REVIVAL_PLAN.md) before expanding scope.
+[`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md) before changing product
+behaviour or expanding scope.
 
 ## Local setup
 
@@ -30,7 +30,10 @@ Routes:
 ```bash
 npm run build
 npm run lint
+npm test
 ```
 
-The production build passes as of 2026-09-29. Lint still exposes recovered
-prototype debt; see the project-state document for the current count and risks.
+The clean install, build, lint, scoring and category-consensus tests pass as of
+2026-09-29, and `npm audit` reports zero known vulnerabilities. The recovered Supabase
+credentials no longer authenticate; read [`supabase/README.md`](supabase/README.md)
+before connecting or creating a backend.

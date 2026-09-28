@@ -6,6 +6,7 @@ import CategoryOptIn from '../mobile/CategoryOptIn'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { parsePrompt, parseRoomEvent, parseStringArray } from '../lib/gameState'
 
 const COLORS = [
   { name: 'Red', value: '🔴', hex: '#ef4444' },
@@ -93,7 +94,8 @@ export default function Lobby() {
       const qrDataUrl = await generateQRCode(joinUrl)
       setQrCode(qrDataUrl)
 
-      const roomChannel = subscribeToRoom(id, async (payload: any) => {
+      const roomChannel = subscribeToRoom(id, async (payload) => {
+        const event = parseRoomEvent(payload)
         console.log('Lobby received event:', payload)
         const boardState = await deriveBoardState(id)
         setPlayers(boardState.players)
@@ -104,8 +106,8 @@ export default function Lobby() {
         setSubmissionCount(boardState.submissionCount || 0)
         setSubmittedIds(boardState.submittedPlayerIds || [])
         setRoundDeadline(boardState.currentRound?.deadline || '')
-        setCurrentCategory((boardState.currentRound as any)?.category || '')
-        setCurrentPrompt(((boardState.currentRound as any)?.prompt?.text) || '')
+        setCurrentCategory(boardState.currentRound?.category || '')
+        setCurrentPrompt(boardState.currentRound ? parsePrompt(boardState.currentRound.prompt) : '')
         setCategoriesLocked(boardState.categoriesLocked || 0)
 
         // Set up deadline auto-progression timer
@@ -172,30 +174,36 @@ export default function Lobby() {
         }
 
         // Auto-reveal when everyone submitted and not yet revealed
-        const round = (boardState as any).currentRound
+        const round = boardState.currentRound
         if (round && boardState.submissionCount === boardState.playerCount) {
           const rid = round.id as string
-          const revealed = Array.isArray(round.reveal_order) && round.reveal_order.length > 0
+          const revealed = parseStringArray(round.reveal_order).length > 0
           if (!revealed && autoFlagsRef.current.revealedFor !== rid) {
             autoFlagsRef.current.revealedFor = rid
             try {
               await revealRound(id)
               // Auto-start voting immediately after reveal
               await startVotePhase(id)
-            } catch {}
+            } catch (error) {
+              console.error('Automatic reveal failed', error)
+            }
           }
         }
 
         // Auto-finalize at vote deadline
-        if (payload?.event === 'round:vote_start') {
-          const dl = payload?.payload?.voteDeadline
+        if (event.event === 'round:vote_start') {
+          const dl = event.payload?.voteDeadline
           if (dl) {
             const ms = Math.max(0, new Date(dl).getTime() - Date.now())
             if (autoFlagsRef.current.voteTimer) {
-              clearTimeout(autoFlagsRef.current.voteTimer as any)
+              clearTimeout(autoFlagsRef.current.voteTimer)
             }
             autoFlagsRef.current.voteTimer = window.setTimeout(async () => {
-              try { await finalizeRound(id) } catch {}
+              try {
+                await finalizeRound(id)
+              } catch (error) {
+                console.error('Automatic finalization failed', error)
+              }
               autoFlagsRef.current.voteTimer = null
             }, ms)
           }
@@ -212,8 +220,8 @@ export default function Lobby() {
       setSubmissionCount(initialState.submissionCount || 0)
       setSubmittedIds(initialState.submittedPlayerIds || [])
       setRoundDeadline(initialState.currentRound?.deadline || '')
-      setCurrentCategory((initialState.currentRound as any)?.category || '')
-      setCurrentPrompt(((initialState.currentRound as any)?.prompt?.text) || '')
+      setCurrentCategory(initialState.currentRound?.category || '')
+      setCurrentPrompt(initialState.currentRound ? parsePrompt(initialState.currentRound.prompt) : '')
       setCategoriesLocked(initialState.categoriesLocked || 0)
 
       // Set up deadline auto-progression timer
@@ -263,7 +271,7 @@ export default function Lobby() {
       console.error('Error initializing lobby for room:', err)
       setError('Failed to resume room')
     }
-  }, [navigate])
+  }, [computeExpiry, navigate])
 
   const handleCreateRoom = async () => {
     setIsLoading(true)
@@ -309,7 +317,7 @@ export default function Lobby() {
       setShowHostJoinModal(false)
       setShowHostCategories(true)
       // Remove hostJoin flag from URL to prevent modal on refresh
-      try { window.history.replaceState(null, '', `/lobby?room=${roomId}`) } catch {}
+      window.history.replaceState(null, '', `/lobby?room=${roomId}`)
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join as host')
@@ -420,7 +428,7 @@ export default function Lobby() {
       setResumeRooms(augmented)
     }
     load()
-  }, [hostDeviceId, roomId])
+  }, [computeExpiry, hostDeviceId, roomId])
 
   // If host is already a player, resume category selection if not yet chosen
   useEffect(() => {
@@ -433,11 +441,10 @@ export default function Lobby() {
           .eq('id', hostPlayerId)
           .single()
         if (error) return
-        const sel = (data as any)?.selected_categories
-        const hasSelections = Array.isArray(sel) && sel.length > 0
+        const hasSelections = parseStringArray(data?.selected_categories).length > 0
         setShowHostCategories(!hasSelections)
-      } catch {
-        // noop
+      } catch (error) {
+        console.error('Failed to restore host category state', error)
       }
     })()
   }, [hostPlayerId, roomId])
@@ -467,22 +474,16 @@ export default function Lobby() {
       deadlineTimerRef.current = null
     }
     // Extra safety: ensure no lingering channels remain
-    try {
-      // @ts-ignore supabase-js v2 exposes getChannels
-      const chans = (supabase as any).getChannels ? (supabase as any).getChannels() : []
-      if (Array.isArray(chans)) {
-        chans.forEach((ch: any) => {
-          try { supabase.removeChannel(ch) } catch {}
-        })
-      }
-    } catch {}
+    supabase.getChannels().forEach((roomChannel) => {
+      void supabase.removeChannel(roomChannel)
+    })
     setRoomId('')
     setPlayers([])
     setQrCode('')
     setShowHostJoinModal(false)
     setShowHostCategories(false)
     // Clear query params immediately and navigate to splash home
-    try { window.history.replaceState(null, '', '/') } catch {}
+    window.history.replaceState(null, '', '/')
     navigate('/', { replace: true })
   }
 
@@ -795,7 +796,7 @@ export default function Lobby() {
                         try {
                           if (players.length < 3 || categoriesLocked === 0) return
                           const opts = previewCategory && previewPrompt ? { category: previewCategory, promptText: previewPrompt } : undefined
-                          await startRound(roomId, opts as any)
+                          await startRound(roomId, opts)
 
                           // If host is also a player, redirect them to mobile player view
                           if (hostPlayerId) {
@@ -907,7 +908,7 @@ export default function Lobby() {
                     onClick={async () => {
                       try {
                         const opts = previewCategory && previewPrompt ? { category: previewCategory, promptText: previewPrompt } : undefined
-                        await startRound(roomId, opts as any)
+                        await startRound(roomId, opts)
                       } catch (e) {
                         console.error('Failed to start round', e)
                       }
@@ -923,17 +924,6 @@ export default function Lobby() {
         )}
         {!roundDeadline && (
           <button onClick={handleLeaveRoom} className="mb-6 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded">Leave Room</button>
-        )}
-        {/* Round controls (debug/advanced) hidden during focused Question view */}
-        {false && roundDeadline && (
-          <div className="mb-6 bg-gray-800 p-4 rounded-lg text-left text-white">
-            <h3 className="text-lg font-semibold mb-2">Round Controls</h3>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={async () => { try { await revealRound(roomId) } catch (e) { setError((e as Error).message) } }} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded">Reveal Answers</button>
-              <button onClick={async () => { try { await startVotePhase(roomId) } catch (e) { setError((e as Error).message) } }} className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded">Start Vote (30s)</button>
-              <button onClick={async () => { try { await finalizeRound(roomId) } catch (e) { setError((e as Error).message) } }} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Finalize Results</button>
-            </div>
-          </div>
         )}
         {expiresInSec != null && expiresInSec <= 300 && (
           <div className="mb-4 p-4 bg-yellow-200 text-yellow-900 rounded-lg">

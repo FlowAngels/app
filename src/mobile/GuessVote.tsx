@@ -13,8 +13,9 @@ interface GuessVoteProps {
 export default function GuessVote({ roomId, playerId, items, voteDeadline }: GuessVoteProps) {
   const [roundId, setRoundId] = useState<string>('')
   const [guessId, setGuessId] = useState<string | null>(null)
-  const [votes, setVotesState] = useState<string[]>([])
+  const [voteId, setVoteId] = useState<string | null>(null)
   const [ownIds, setOwnIds] = useState<Set<string>>(new Set())
+  const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
     const load = async () => {
@@ -36,17 +37,21 @@ export default function GuessVote({ roomId, playerId, items, voteDeadline }: Gue
       }
     }
     load()
-  }, [roomId])
+  }, [playerId, roomId])
 
-  const msLeft = useMemo(() => voteDeadline ? Math.max(0, new Date(voteDeadline).getTime() - Date.now()) : 0, [voteDeadline])
+  const msLeft = useMemo(
+    () => (voteDeadline ? Math.max(0, new Date(voteDeadline).getTime() - now) : 0),
+    [now, voteDeadline],
+  )
   useEffect(() => {
     if (!voteDeadline) return
-    const t = setInterval(() => {}, 500)
+    setNow(Date.now())
+    const t = window.setInterval(() => setNow(Date.now()), 500)
     return () => clearInterval(t)
   }, [voteDeadline])
 
-  const addVote = (id: string) => setVotesState(prev => prev.length < 2 ? [...prev, id] : [prev[0], id])
-  const clearVotes = () => setVotesState([])
+  const selectVote = (id: string) => setVoteId(id)
+  const clearVote = () => setVoteId(null)
   const selectGuess = (id: string) => setGuessId(id)
 
   useEffect(() => {
@@ -54,11 +59,13 @@ export default function GuessVote({ roomId, playerId, items, voteDeadline }: Gue
       if (!roundId) return
       try {
         if (guessId) await upsertGuess(roundId, playerId, guessId)
-        await setVotes(roundId, playerId, votes)
-      } catch {}
+        await setVotes(roundId, playerId, voteId ? [voteId] : [])
+      } catch (error) {
+        console.error('Failed to save guess or votes', error)
+      }
     }
     sync()
-  }, [roundId, playerId, guessId, votes])
+  }, [roundId, playerId, guessId, voteId])
 
   const secondsLeft = Math.ceil(msLeft / 1000)
 
@@ -71,7 +78,7 @@ export default function GuessVote({ roomId, playerId, items, voteDeadline }: Gue
         <div className="space-y-3">
           {items.map(item => {
             const isOwn = ownIds.has(item.id)
-            const voteCount = votes.filter(v => v === item.id).length
+            const isVote = voteId === item.id
             const isGuess = guessId === item.id
             return (
               <div key={item.id} className={`w-full p-4 rounded-xl border-2 ${isGuess ? 'border-purple-600 bg-purple-50' : 'border-gray-200 bg-white'}`}>
@@ -86,21 +93,23 @@ export default function GuessVote({ roomId, playerId, items, voteDeadline }: Gue
                   </button>
                   <div className="flex items-center gap-2">
                     <button
-                      disabled={isOwn || votes.length >= 2}
-                      onClick={() => addVote(item.id)}
-                      className={`px-3 py-1 rounded ${isOwn || votes.length >= 2 ? 'bg-gray-200 text-gray-400' : 'bg-yellow-100 hover:bg-yellow-200'}`}
+                      disabled={isOwn}
+                      onClick={() => selectVote(item.id)}
+                      className={`px-3 py-1 rounded ${isOwn ? 'bg-gray-200 text-gray-400' : isVote ? 'bg-yellow-400 text-gray-900' : 'bg-yellow-100 hover:bg-yellow-200'}`}
                     >
-                      Vote ★
+                      {isVote ? 'Favourite ★' : 'Vote ★'}
                     </button>
-                    <span className="text-gray-500">{isOwn ? '—' : `${voteCount}★`}</span>
                   </div>
                 </div>
               </div>
             )
           })}
         </div>
-        <div className="mt-3 text-center text-xs text-gray-500">Votes left: {Math.max(0, 2 - votes.length)} {votes.length > 0 && (<button onClick={clearVotes} className="ml-2 underline">Clear</button>)}</div>
-        <p className="text-xs text-gray-500 mt-3 text-center">Tap Guess (👤) and Vote (★). You can change until time's up.</p>
+        <div className="mt-3 text-center text-xs text-gray-500">
+          Choose one favourite
+          {voteId && (<button onClick={clearVote} className="ml-2 underline">Clear</button>)}
+        </div>
+        <p className="text-xs text-gray-500 mt-3 text-center">Choose who sounds like the round owner (👤), then choose your favourite answer (★). You can change both until time's up.</p>
       </div>
     </div>
   )

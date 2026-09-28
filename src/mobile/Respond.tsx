@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { submitAnswer } from '../lib/orchestrator'
+import { parsePrompt } from '../lib/gameState'
 
 interface RespondProps {
   roomId: string
@@ -27,9 +28,8 @@ export default function Respond({ roomId, playerId }: RespondProps) {
         .single()
       if (!error && data) {
         setRoundId(data.id)
-        setDeadline(data.deadline)
-        const p = (data as any)?.prompt
-        if (p && typeof p === 'object' && p.text) setPrompt(p.text)
+        setDeadline(data.deadline || '')
+        setPrompt(parsePrompt(data.prompt))
       }
     }
     load()

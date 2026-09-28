@@ -290,7 +290,7 @@ export default function SplashScreen() {
         }}>
           A couch-friendly, phone-controlled party game.<br />
           Submit snappy answers, spot the round owner,<br />
-          vote your favorites. Two champions, endless<br />
+          vote for your favourite. Two champions, endless<br />
           laughs.
         </div>
 

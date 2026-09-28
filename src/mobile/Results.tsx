@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { parseLeaderboards, parseRoundResults } from '../lib/gameState'
 
 interface Props { roomId: string; playerId: string }
 
@@ -18,24 +19,25 @@ export default function Results({ roomId, playerId }: Props) {
         .order('created_at', { ascending: false })
         .limit(1)
         .single()
-      const res: any = round?.results || {}
-      setVoteCounts(res.voteCounts || {})
+      if (!round) return
+      const res = parseRoundResults(round.results)
+      setVoteCounts(res.voteCounts)
 
       const { data: g } = await supabase
         .from('guesses')
         .select('answer_id')
-        .eq('round_id', round?.id)
+        .eq('round_id', round.id)
         .eq('player_id', playerId)
         .maybeSingle()
-      setCorrect(!!g && res.ownerAnswerId && g.answer_id === res.ownerAnswerId)
+      setCorrect(!!g && !!res.ownerAnswerId && g.answer_id === res.ownerAnswerId)
 
       const { data: mySub } = await supabase
         .from('submissions')
         .select('id')
-        .eq('round_id', round?.id)
+        .eq('round_id', round.id)
         .eq('player_id', playerId)
         .maybeSingle()
-      const myId = (mySub as any)?.id
+      const myId = mySub?.id
       setMyAnswerVotes(myId ? (res.voteCounts?.[myId] || 0) : 0)
 
       const { data: room } = await supabase
@@ -43,7 +45,7 @@ export default function Results({ roomId, playerId }: Props) {
         .select('leaderboards')
         .eq('id', roomId)
         .single()
-      const lb: any = (room as any)?.leaderboards || { chameleon: {}, crowd: {} }
+      const lb = parseLeaderboards(room?.leaderboards)
       setPosition({ chameleon: lb.chameleon[playerId] || 0, crowd: lb.crowd[playerId] || 0 })
     }
     load()

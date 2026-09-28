@@ -1,9 +1,7 @@
 # Whatever! — Codex working agreement
 
-Read `../docs/PROJECT_STATE.md`, `../docs/mvp.md`, and
-`../docs/REVIVAL_PLAN.md` before changing product behaviour. The first two
-describe the recovered implementation and original intent; the revival plan is
-the current decision record.
+Read `docs/PROJECT_CONTEXT.md` before changing product behaviour. It records the
+recovered implementation, original intent, current risks, and revival plan.
 
 ## Product intent
 
@@ -24,8 +22,8 @@ reveal a player's category choices or answer ownership before results.
 - Do not expose or commit `.env.local`.
 - Do not assume the live Supabase schema matches the planning document. Add
   versioned migrations before making schema changes.
-- The existing working tree contains recovered, uncommitted work from 2025.
-  Preserve it and use small, reviewable commits.
+- Recovered 2025 work is preserved in commit `678780b`. Keep later changes
+  small and reviewable.
 - Do not deploy, alter the live database, or enable payments without Tim's
   explicit approval.
 
@@ -38,7 +36,7 @@ Before calling work complete:
 3. Exercise a real multi-client path: one host plus at least three player
    sessions.
 4. Verify refresh/rejoin, AFK timeout, duplicate actions, and host disconnect.
-5. Update `../docs/PROJECT_STATE.md` when a milestone or known risk changes.
+5. Update `docs/PROJECT_CONTEXT.md` when a milestone or known risk changes.
 
 The server/database must be authoritative for phase transitions and scoring.
 Client timers may display time but must not be the only mechanism that advances

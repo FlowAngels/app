@@ -1,6 +1,8 @@
 import { supabase } from './supabase'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { getPrompt } from './prompts'
+import { intersectCategorySelections, parseLeaderboards, parseStringArray } from './gameState'
+import { scoreRound } from './scoring'
 
 // Keep a per-room channel so we can reliably send/receive
 const roomChannels = new Map<string, RealtimeChannel>()
@@ -160,24 +162,9 @@ export async function computeCategoryIntersection(roomId: string): Promise<strin
     return []
   }
   
-  // Filter out players who haven't made selections yet
-  const playersWithSelections = players.filter(
-    player => player.selected_categories && Array.isArray(player.selected_categories) && player.selected_categories.length > 0
-  )
-  
-  if (playersWithSelections.length === 0) {
-    return []
-  }
-  
-  // Compute intersection: categories that ALL players selected
-  const allCategories = ['headline_hijack', 'law_or_nah', 'meme_mash']
-  const intersection = allCategories.filter(category => 
-    playersWithSelections.every(player => 
-      player.selected_categories.includes(category)
-    )
-  )
-  
-  return intersection
+  const selections = players.map((player) => parseStringArray(player.selected_categories))
+
+  return intersectCategorySelections(selections)
 }
 
 // Update room's category pool
@@ -244,17 +231,17 @@ export async function deriveBoardState(roomId: string) {
       .from('submissions')
       .select('player_id')
       .eq('round_id', currentRound.id)
-    submittedPlayerIds = (submitted || []).map((s: any) => s.player_id)
+    submittedPlayerIds = (submitted || []).map((submission) => submission.player_id)
     const { data: subs } = await supabase
       .from('submissions')
       .select('id, text, player_id')
       .eq('round_id', currentRound.id)
-    currentSubmissions = (subs || []) as any
+    currentSubmissions = subs || []
   }
   
   // Sort players alphabetically by name (case-insensitive)
-  const sortedPlayers = (players || []).slice().sort((a: any, b: any) =>
-    (a?.name || '').localeCompare(b?.name || '', undefined, { sensitivity: 'base' })
+  const sortedPlayers = (players || []).slice().sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
   )
 
   return {
@@ -286,12 +273,12 @@ export function subscribeToRoom(roomId: string, callback: (payload: unknown) => 
       await updateCategoryPool(roomId)
       callback(payload)
     })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, async (_payload) => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, async () => {
       // Any player change should cause a fresh derive and UI update
       await updateCategoryPool(roomId)
       callback({ type: 'players:changed' })
     })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, async (_payload) => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, () => {
       // Room-level changes (e.g., category_pool) should reflect in UI
       callback({ type: 'rooms:changed' })
     })
@@ -329,7 +316,7 @@ export async function startRound(roomId: string, opts?: { category?: string; pro
     .eq('id', roomId)
     .single()
   if (roomErr || !room) throw new Error('Room not found')
-  const pool: string[] = Array.isArray(room.category_pool) ? room.category_pool : []
+  const pool = parseStringArray(room.category_pool)
   if (pool.length === 0 && !opts?.category) throw new Error('No categories available')
   const category = opts?.category || pool[0]
 
@@ -339,8 +326,8 @@ export async function startRound(roomId: string, opts?: { category?: string; pro
     .select('id,name')
     .eq('room_id', roomId)
     .eq('connected', true)
-  const sortedPl = (pl || []).slice().sort((a:any,b:any)=> (a?.name||'').localeCompare(b?.name||'', undefined, {sensitivity:'base'}))
-  const idx = Math.max(0, (room as any).round_index || 0) % Math.max(1, sortedPl.length || 1)
+  const sortedPl = (pl || []).slice().sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  const idx = Math.max(0, room.round_index || 0) % Math.max(1, sortedPl.length || 1)
   const ownerId = sortedPl.length > 0 ? sortedPl[idx].id : null
 
   // Insert round without deadline initially
@@ -457,15 +444,17 @@ export async function upsertGuess(roundId: string, playerId: string, submissionI
   if (error) throw new Error(error.message)
 }
 
-// Set votes (replace player's vote set). Allows duplicates to same answer.
+// Set a player's single favourite vote.
 export async function setVotes(roundId: string, playerId: string, submissionIds: string[]): Promise<void> {
-  // Ensure at most 2 items
-  const ids = submissionIds.slice(0, 2)
+  const answerId = submissionIds[0]
   // Replace set
   await supabase.from('votes').delete().eq('round_id', roundId).eq('player_id', playerId)
-  if (ids.length === 0) return
-  const rows = ids.map(id => ({ round_id: roundId, player_id: playerId, answer_id: id }))
-  const { error } = await supabase.from('votes').insert(rows)
+  if (!answerId) return
+  const { error } = await supabase.from('votes').insert({
+    round_id: roundId,
+    player_id: playerId,
+    answer_id: answerId,
+  })
   if (error) throw new Error(error.message)
 }
 
@@ -486,61 +475,55 @@ export async function finalizeRound(roomId: string): Promise<{ ownerAnswerId: st
     .from('submissions')
     .select('id, player_id')
     .eq('round_id', round.id)
-  const subById = new Map((subs || []).map(s => [s.id, s.player_id]))
 
-  // Owner answer id
-  let ownerAnswerId: string | null = null
-  for (const s of subs || []) {
-    if (s.player_id === round.owner_id) { ownerAnswerId = s.id; break }
-  }
-
-  // Correct guessers
   const { data: guesses } = await supabase
     .from('guesses')
     .select('player_id, answer_id')
     .eq('round_id', round.id)
-  const correctGuessers = (guesses || [])
-    .filter(g => ownerAnswerId && g.answer_id === ownerAnswerId)
-    .map(g => g.player_id)
 
-  // Vote counts per submission id
   const { data: votes } = await supabase
     .from('votes')
     .select('answer_id')
     .eq('round_id', round.id)
-  const voteCounts: Record<string, number> = {}
-  for (const v of votes || []) {
-    voteCounts[v.answer_id] = (voteCounts[v.answer_id] || 0) + 1
-  }
 
-  // Update rounds.results JSON
-  await supabase
-    .from('rounds')
-    .update({ results: { ownerAnswerId, correctGuessers, voteCounts } })
-    .eq('id', round.id)
-
-  // Update leaderboards in rooms
   const { data: room } = await supabase
     .from('rooms')
-    .select('leaderboards')
+    .select('leaderboards, round_index')
     .eq('id', roomId)
     .single()
-  const lb = (room?.leaderboards as any) || { chameleon: {}, crowd: {} }
-  // Chameleon: +1 per correct guesser
-  for (const pid of correctGuessers) {
-    lb.chameleon[pid] = (lb.chameleon[pid] || 0) + 1
-  }
-  // Crowd: +1 per vote goes to the answer's owner
-  for (const [answerId, count] of Object.entries(voteCounts)) {
-    const ownerPid = subById.get(answerId)
-    if (!ownerPid) continue
-    lb.crowd[ownerPid] = (lb.crowd[ownerPid] || 0) + (count as number)
-  }
+  const { data: players } = await supabase
+    .from('players')
+    .select('id')
+    .eq('room_id', roomId)
+    .eq('connected', true)
+
+  if (!round.owner_id) throw new Error('Round owner is missing')
+  const scored = scoreRound({
+    ownerId: round.owner_id,
+    playerIds: (players || []).map((player) => player.id),
+    submissions: (subs || []).map((submission) => ({
+      id: submission.id,
+      playerId: submission.player_id,
+    })),
+    guesses: (guesses || []).map((guess) => ({
+      playerId: guess.player_id,
+      answerId: guess.answer_id,
+    })),
+    votes: (votes || []).map((vote) => ({ answerId: vote.answer_id })),
+    leaderboards: parseLeaderboards(room?.leaderboards),
+  })
+
+  await supabase.from('rounds').update({ results: scored.results }).eq('id', round.id)
+
   await supabase
     .from('rooms')
-    .update({ leaderboards: lb, status: 'results', round_index: ((room as any).round_index || 0) + 1 })
+    .update({
+      leaderboards: scored.leaderboards,
+      status: 'results',
+      round_index: (room?.round_index || 0) + 1,
+    })
     .eq('id', roomId)
 
-  await broadcast(roomId, 'round:results', { ownerAnswerId, correctGuessers, voteCounts })
-  return { ownerAnswerId, correctGuessers, voteCounts }
+  await broadcast(roomId, 'round:results', scored.results)
+  return scored.results
 }

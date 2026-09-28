@@ -7,6 +7,7 @@ import Respond from './Respond'
 import GuessVote from './GuessVote'
 import Results from './Results'
 import { subscribeToRoom, unsubscribeFromRoom } from '../lib/orchestrator'
+import { parseRoomEvent, parseStringArray } from '../lib/gameState'
 
 const COLORS = [
   { name: 'Red', value: '🔴', hex: '#ef4444' },
@@ -91,7 +92,7 @@ export default function Join() {
         // Player exists, check game state
         const boardState = await deriveBoardState(roomId)
 
-        if (!player.selected_categories || player.selected_categories.length === 0) {
+        if (parseStringArray(player.selected_categories).length === 0) {
           // Player hasn't selected categories yet
           setSuccess('joined')
           setPhaseInitialized(true)
@@ -163,7 +164,7 @@ export default function Join() {
   useEffect(() => {
     if (!roomId) return
     const ch = subscribeToRoom(roomId, (payload) => {
-      const p: any = payload
+      const p = parseRoomEvent(payload)
       if (p?.event === 'round:countdown_start') {
         setPhase('respond')
       }
@@ -230,7 +231,11 @@ export default function Join() {
         }
         // Broadcast so host UI updates even if PG changes are not enabled
         if (rid) {
-          try { await broadcast(rid, 'room:update', { type: 'player:left', playerId }) } catch {}
+          try {
+            await broadcast(rid, 'room:update', { type: 'player:left', playerId })
+          } catch (error) {
+            console.warn('Failed to broadcast player departure', error)
+          }
         }
       }
     } catch (e) {
