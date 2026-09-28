@@ -17,15 +17,32 @@ export default function SplashScreen() {
         localStorage.setItem('hostDeviceId', hostDeviceId)
       }
 
-      // If a current room is cached, allow resume immediately
+      // Check if cached room is still valid (exists, not ended, <30m old)
       const cached = localStorage.getItem('currentRoomId')
       if (cached) {
-        setCanResume(true)
-        setLatestRoomId(cached)
-        return
+        const { data: cachedRoom, error } = await supabase
+          .from('rooms')
+          .select('id,status,created_at')
+          .eq('id', cached)
+          .eq('host_device_id', hostDeviceId)
+          .neq('status', 'ended')
+          .single()
+
+        if (!error && cachedRoom) {
+          const now = Date.now()
+          const roomAge = now - new Date(cachedRoom.created_at).getTime()
+          if (roomAge < 30 * 60 * 1000) { // Less than 30 minutes old
+            setCanResume(true)
+            setLatestRoomId(cached)
+            return
+          }
+        }
+
+        // Cached room is invalid, remove it
+        localStorage.removeItem('currentRoomId')
       }
 
-      // Otherwise, look up recent rooms for this device (not ended, <30m old)
+      // Look up recent rooms for this device (not ended, <30m old)
       const { data, error } = await supabase
         .from('rooms')
         .select('id,status,created_at')
@@ -49,7 +66,7 @@ export default function SplashScreen() {
       background: 'radial-gradient(ellipse at center, #0f172a 0%, #1e293b 30%, #0f172a 70%, #000 100%)',
       fontFamily: 'system-ui, -apple-system, sans-serif'
     }}>
-      
+
       {/* 3D Textured Characters */}
       <div className="absolute" style={{
         top: '8%',
@@ -138,7 +155,7 @@ export default function SplashScreen() {
 
       {/* Main Content */}
       <div className="text-center relative z-10 px-8" style={{maxWidth: '80rem'}}>
-        
+
         {/* WHATEVER! Title */}
         <h1 style={{
           fontSize: '8.5rem',
@@ -164,7 +181,7 @@ export default function SplashScreen() {
             `,
             filter: 'drop-shadow(0 0 20px #00f5ff)'
           }}>WHAT</span>
-          
+
           {/* EVER! - Neon tube style */}
           <span style={{
             color: 'transparent',
@@ -182,12 +199,12 @@ export default function SplashScreen() {
             filter: 'drop-shadow(0 0 20px #ff1493)'
           }}>EVER!</span>
         </h1>
-        
+
         {/* Add CSS for neon tube animation */}
         <style>{`
           @keyframes neonFlicker {
             0%, 18%, 22%, 25%, 53%, 57%, 100% {
-              text-shadow: 
+              text-shadow:
                 0 0 10px currentColor,
                 0 0 20px currentColor,
                 0 0 30px currentColor,
@@ -197,7 +214,7 @@ export default function SplashScreen() {
                 0 0 100px currentColor;
             }
             20%, 24%, 55% {
-              text-shadow: 
+              text-shadow:
                 0 0 5px currentColor,
                 0 0 10px currentColor,
                 0 0 15px currentColor,
@@ -243,7 +260,7 @@ export default function SplashScreen() {
               fontSize: '1.25rem',
               textShadow: '0 0 10px #10b981, 0 0 20px #10b981'
             }}>
-              1–8 players
+              3–8 players
             </span>
           </div>
 
@@ -302,8 +319,8 @@ export default function SplashScreen() {
               fontWeight: '600',
               border: '2px solid #ff1493'
             }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 20, 147, 0.5)'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255, 20, 147, 0.3)'}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 20, 147, 0.5)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 20, 147, 0.3)'}
           >
             NEW GAME!
           </button>
@@ -326,8 +343,8 @@ export default function SplashScreen() {
                 fontWeight: '600',
                 border: '2px solid #00f5ff'
               }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 245, 255, 0.5)'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 245, 255, 0.3)'}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 245, 255, 0.5)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 245, 255, 0.3)'}
             >
               Resume?
             </button>

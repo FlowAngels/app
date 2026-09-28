@@ -53,11 +53,13 @@ export default function Respond({ roomId, playerId }: RespondProps) {
     if (!roundId) return
     setSubmitting(true)
     try {
+      console.log('Submitting answer:', { roundId, playerId, text: text.trim() })
       await submitAnswer(roundId, playerId, text)
+      console.log('Answer submitted successfully')
       setSubmitted(true)
     } catch (e) {
+      console.error('Submit error:', e)
       alert((e as Error).message || 'Failed to submit')
-    } finally {
       setSubmitting(false)
     }
   }

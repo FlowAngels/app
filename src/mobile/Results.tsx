@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase'
 interface Props { roomId: string; playerId: string }
 
 export default function Results({ roomId, playerId }: Props) {
-  const [ownerAnswerId, setOwnerAnswerId] = useState<string | null>(null)
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
   const [correct, setCorrect] = useState<boolean>(false)
   const [myAnswerVotes, setMyAnswerVotes] = useState<number>(0)
@@ -20,7 +19,6 @@ export default function Results({ roomId, playerId }: Props) {
         .limit(1)
         .single()
       const res: any = round?.results || {}
-      setOwnerAnswerId(res.ownerAnswerId || null)
       setVoteCounts(res.voteCounts || {})
 
       const { data: g } = await supabase

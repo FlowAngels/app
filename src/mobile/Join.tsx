@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { joinRoom, broadcast } from '../lib/orchestrator'
+import { joinRoom, broadcast, deriveBoardState } from '../lib/orchestrator'
 import { supabase } from '../lib/supabase'
 import CategoryOptIn from './CategoryOptIn'
 import Respond from './Respond'
 import GuessVote from './GuessVote'
 import Results from './Results'
 import { subscribeToRoom, unsubscribeFromRoom } from '../lib/orchestrator'
-import type { RealtimeChannel } from '@supabase/supabase-js'
 
 const COLORS = [
   { name: 'Red', value: '🔴', hex: '#ef4444' },
@@ -32,6 +31,7 @@ export default function Join() {
   const [leftRoomId, setLeftRoomId] = useState<string | null>(null)
   const [takenColors, setTakenColors] = useState<string[]>([])
   const [phase, setPhase] = useState<'idle' | 'respond' | 'ready' | 'guessvote' | 'results'>('idle')
+  const [phaseInitialized, setPhaseInitialized] = useState(false)
   const [revealItems, setRevealItems] = useState<{ id: string; text: string }[]>([])
   const [voteDeadline, setVoteDeadline] = useState<string | undefined>(undefined)
 
@@ -46,8 +46,7 @@ export default function Join() {
             .from('players')
             .update({ connected: false })
             .eq('id', playerId)
-            .then(() => {})
-            .catch(() => {})
+            .then(() => undefined, () => undefined)
         }
       } catch {
         // ignore
@@ -62,24 +61,85 @@ export default function Join() {
     }
   }, [success])
 
+  // Check existing player state and resume correct phase
+  useEffect(() => {
+    const checkExistingPlayer = async () => {
+      if (!roomId || phaseInitialized) return
+
+      const playerId = localStorage.getItem('playerId')
+      if (!playerId) {
+        setPhaseInitialized(true)
+        return
+      }
+
+      try {
+        // Check if player still exists and is connected
+        const { data: player, error: playerError } = await supabase
+          .from('players')
+          .select('id, name, connected, selected_categories')
+          .eq('id', playerId)
+          .eq('room_id', roomId)
+          .single()
+
+        if (playerError || !player) {
+          // Player doesn't exist, clear storage and start fresh
+          localStorage.removeItem('playerId')
+          setPhaseInitialized(true)
+          return
+        }
+
+        // Player exists, check game state
+        const boardState = await deriveBoardState(roomId)
+
+        if (!player.selected_categories || player.selected_categories.length === 0) {
+          // Player hasn't selected categories yet
+          setSuccess('joined')
+          setPhaseInitialized(true)
+          return
+        }
+
+        // Player has selected categories
+        setSuccess('categories_selected')
+
+        // Determine phase based on current round state
+        if (boardState.currentRound) {
+          if (boardState.currentRound.deadline) {
+            // Round is active with countdown
+            setPhase('respond')
+          } else {
+            // Round started but no countdown yet
+            setPhase('idle')
+          }
+        }
+
+        setPhaseInitialized(true)
+      } catch (error) {
+        console.error('Error checking existing player:', error)
+        setPhaseInitialized(true)
+      }
+    }
+
+    checkExistingPlayer()
+  }, [roomId, phaseInitialized])
+
   const fetchTakenColors = useCallback(async () => {
     if (!roomId) return
-    
+
     try {
       const { data: players, error } = await supabase
         .from('players')
         .select('avatar')
         .eq('room_id', roomId)
         .eq('connected', true)
-      
+
       if (error) {
         console.error('Error fetching taken colors:', error)
         return
       }
-      
+
       const taken = players?.map(player => player.avatar) || []
       setTakenColors(taken)
-      
+
       // If selected color is taken, select first available
       if (taken.includes(selectedColor.value)) {
         const availableColor = COLORS.find(color => !taken.includes(color.value))
@@ -99,12 +159,12 @@ export default function Join() {
     }
   }, [roomId, fetchTakenColors])
 
-  // Subscribe to round:start to flip into Respond phase
+  // Subscribe to round:countdown_start to flip into Respond phase
   useEffect(() => {
     if (!roomId) return
     const ch = subscribeToRoom(roomId, (payload) => {
       const p: any = payload
-      if (p?.event === 'round:start') {
+      if (p?.event === 'round:countdown_start') {
         setPhase('respond')
       }
       if (p?.event === 'round:reveal') {
@@ -140,7 +200,7 @@ export default function Join() {
 
     setIsJoining(true)
     setError('')
-    
+
     try {
       const result = await joinRoom(roomId, properName, selectedColor.value)
       setName(properName)
@@ -207,9 +267,9 @@ export default function Join() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <CategoryOptIn 
-            playerId={playerId} 
-            roomId={roomId!} 
+          <CategoryOptIn
+            playerId={playerId}
+            roomId={roomId!}
             onComplete={() => setSuccess('categories_selected')}
           />
           <div className="mt-4 text-center">
@@ -226,7 +286,7 @@ export default function Join() {
   }
 
   if (success === 'categories_selected') {
-    // If a round is already active, render Respond; otherwise show waiting screen until round:start
+    // If a round is already active, render Respond; otherwise show waiting screen until round:countdown_start
     if (phase === 'respond') {
       const playerId = localStorage.getItem('playerId')!
       return <Respond roomId={roomId!} playerId={playerId} />
@@ -265,13 +325,13 @@ export default function Join() {
             You left Room {leftRoomId}. You can rejoin below.
           </div>
         )}
-        
+
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error}
           </div>
         )}
-        
+
         <div className="mb-4">
           <label className="block text-gray-700 text-sm font-bold mb-2">
             Your Name
@@ -285,7 +345,7 @@ export default function Join() {
             maxLength={20}
           />
         </div>
-        
+
         <div className="mb-6">
           <label className="block text-gray-700 text-sm font-bold mb-2">
             Choose Your Color
@@ -294,14 +354,14 @@ export default function Join() {
             {COLORS.map((color) => {
               const isTaken = takenColors.includes(color.value)
               const isSelected = selectedColor.name === color.name
-              
+
               return (
                 <button
                   key={color.name}
                   onClick={() => !isTaken && setSelectedColor(color)}
                   disabled={isTaken}
                   className={`p-3 text-2xl rounded-lg border-4 transition-all ${
-                    isTaken 
+                    isTaken
                       ? 'border-gray-300 bg-gray-200 opacity-50 cursor-not-allowed'
                       : isSelected
                         ? 'border-gray-800 bg-gray-100 scale-110'
@@ -318,7 +378,7 @@ export default function Join() {
             })}
           </div>
         </div>
-        
+
         <button
           onClick={handleJoin}
           disabled={isJoining || !name.trim()}

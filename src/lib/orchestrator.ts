@@ -279,6 +279,7 @@ export function subscribeToRoom(roomId: string, callback: (payload: unknown) => 
     .on('broadcast', { event: 'room:update' }, callback)
     .on('broadcast', { event: 'round:*' }, callback)
     .on('broadcast', { event: 'round:start' }, callback)
+    .on('broadcast', { event: 'round:countdown_start' }, callback)
     .on('broadcast', { event: 'round:submit' }, callback)
     .on('broadcast', { event: 'categories:update' }, async (payload) => {
       // When category selections change, recompute intersection and let subscribers refresh
@@ -342,12 +343,11 @@ export async function startRound(roomId: string, opts?: { category?: string; pro
   const idx = Math.max(0, (room as any).round_index || 0) % Math.max(1, sortedPl.length || 1)
   const ownerId = sortedPl.length > 0 ? sortedPl[idx].id : null
 
-  // Insert round with 60s submission deadline
-  const deadline = new Date(Date.now() + 60 * 1000).toISOString()
+  // Insert round without deadline initially
   const promptText = opts?.promptText || getPrompt(category)
   const { data: round, error: roundErr } = await supabase
     .from('rounds')
-    .insert({ room_id: roomId, category, prompt: { text: promptText }, deadline, owner_id: ownerId })
+    .insert({ room_id: roomId, category, prompt: { text: promptText }, owner_id: ownerId })
     .select('*')
     .single()
   if (roundErr || !round) throw new Error('Failed to start round')
@@ -355,9 +355,34 @@ export async function startRound(roomId: string, opts?: { category?: string; pro
   // Update room status
   await supabase.from('rooms').update({ status: 'inRound' }).eq('id', roomId)
 
-  // Broadcast round start
-  await broadcast(roomId, 'round:start', { roundId: round.id, category, deadline, prompt: promptText })
+  // Broadcast round start (without deadline)
+  await broadcast(roomId, 'round:start', { roundId: round.id, category, prompt: promptText })
   return { roundId: round.id }
+}
+
+// Begin countdown for the current round (60s submission deadline)
+export async function beginRoundCountdown(roomId: string): Promise<{ deadline: string }> {
+  // Get current round
+  const { data: round, error: roundErr } = await supabase
+    .from('rounds')
+    .select('id')
+    .eq('room_id', roomId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+  if (roundErr || !round) throw new Error('No active round found')
+
+  // Set 60s deadline
+  const deadline = new Date(Date.now() + 60 * 1000).toISOString()
+  const { error: updateErr } = await supabase
+    .from('rounds')
+    .update({ deadline })
+    .eq('id', round.id)
+  if (updateErr) throw new Error('Failed to set round deadline')
+
+  // Broadcast countdown start
+  await broadcast(roomId, 'round:countdown_start', { roundId: round.id, deadline })
+  return { deadline }
 }
 
 // Submit an answer for the current round

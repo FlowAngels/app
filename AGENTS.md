@@ -1,0 +1,55 @@
+# Whatever! — Codex working agreement
+
+Read `../docs/PROJECT_STATE.md`, `../docs/mvp.md`, and
+`../docs/REVIVAL_PLAN.md` before changing product behaviour. The first two
+describe the recovered implementation and original intent; the revival plan is
+the current decision record.
+
+## Product intent
+
+Whatever! is a same-room social game for 3–8 people. A shared host screen runs
+the game and phones act as private controllers. Everyone answers the same
+creative prompt; players then try to recognise the Round Owner's answer while
+also voting for the answer they most enjoyed. Its intended advantage over a
+generic prompt-and-vote game is this tension between recognisable voice and
+crowd appeal.
+
+Keep the round legible from across a room, minimise host babysitting, and never
+reveal a player's category choices or answer ownership before results.
+
+## Current boundaries
+
+- Stack: React, TypeScript, Vite, Tailwind, Supabase Postgres + Realtime.
+- Routes: `/`, `/lobby`, and `/join` (`/host` redirects to `/lobby`).
+- Do not expose or commit `.env.local`.
+- Do not assume the live Supabase schema matches the planning document. Add
+  versioned migrations before making schema changes.
+- The existing working tree contains recovered, uncommitted work from 2025.
+  Preserve it and use small, reviewable commits.
+- Do not deploy, alter the live database, or enable payments without Tim's
+  explicit approval.
+
+## Quality bar
+
+Before calling work complete:
+
+1. Run `npm run build` and `npm run lint`.
+2. Add automated tests for scoring and state transitions affected by the work.
+3. Exercise a real multi-client path: one host plus at least three player
+   sessions.
+4. Verify refresh/rejoin, AFK timeout, duplicate actions, and host disconnect.
+5. Update `../docs/PROJECT_STATE.md` when a milestone or known risk changes.
+
+The server/database must be authoritative for phase transitions and scoring.
+Client timers may display time but must not be the only mechanism that advances
+a game. Treat all browser input and room codes as untrusted.
+
+## Product decisions still open
+
+- Validate the original dual-objective loop before expanding the three category
+  concepts. Do not turn it into a game of personal questions without an explicit
+  product decision and comparative playtest.
+- Decide whether the shared TV is essential or optional after playtesting.
+- The name `Whatever!` is a working title; do not invest further in it before a
+  trademark and discoverability check.
+- Monetisation is an experiment after retention, not an MVP dependency.
