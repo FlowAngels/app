@@ -3,7 +3,9 @@
 Read-only dashboard inspection of project `xdetfbvaryghuuoknwvl` (`Whatever!`)
 in the `FlowAngels's Ltd` organization, region `ap-southeast-1`.
 
-No schema, data, key, or project setting was changed during this audit.
+The initial audit was read-only. After Tim's explicit approval, one new
+browser-safe publishable key named `codex_recovery_test` was created to restore
+client access. No secret key, schema, data, or project setting was changed.
 
 ## Project state
 
@@ -13,9 +15,9 @@ No schema, data, key, or project setting was changed during this audit.
 - Dashboard reports no migration history and no scheduled backups.
 - All six public tables have RLS disabled and are reported as critical security
   findings.
-- Existing legacy anon and both existing publishable keys return HTTP 401
-  `Invalid API key` from the Data API. The dashboard displays those same keys,
-  so this is not a local configuration mismatch.
+- The existing legacy anon and two earlier publishable keys returned HTTP 401
+  `Invalid API key` from the Data API. A newly created publishable key returns
+  HTTP 200 and is now used by the ignored local environment file.
 
 ## Existing data
 
@@ -52,9 +54,9 @@ Do not apply it directly to the populated live database: write an explicit,
 data-aware reconciliation migration after deciding whether the old test rows
 should be retained or archived.
 
-## Next diagnostic action
+## Access recovery outcome
 
-Create one new browser-safe publishable key and test it without revoking any
-existing key. Creating a persistent key requires Tim's confirmation at the
-point of action. If the new key is also rejected, treat the project as a
-Supabase platform/support recovery case rather than continuing to rotate keys.
+The local app is reconnected to the original project with a browser-safe key.
+Existing keys were not deliberately revoked or changed. The next database step
+is a data-aware reconciliation migration; do not apply the reconstructed
+baseline migration directly to this populated project.

@@ -38,10 +38,11 @@ Baseline cleanup completed locally on 2026-09-29:
 - database types, a reconstructed migration, and CI checks are versioned; and
 - the original single-favourite, +2 guess, and +3 sweet-spot rules are restored.
 
-The live Supabase project exists and contains prototype data, but all existing
-browser keys return HTTP 401 from its enabled Data API. Its schema has now been
-compared read-only with the reconstructed migration; see
-`supabase/LIVE_AUDIT_2026-09-29.md`. Reconcile it before deploying a backend.
+The live Supabase project exists and contains prototype data. A new approved
+browser-safe publishable key restored local access after its recovered keys
+returned HTTP 401. Its schema has been compared with the reconstructed
+migration; see `supabase/LIVE_AUDIT_2026-09-29.md`. Reconcile it before deploying
+a backend.
 
 ## Fidelity references
 
