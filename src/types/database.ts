@@ -16,6 +16,7 @@ export type Database = {
           id: string
           status: RoomStatus
           host_device_id: string
+          host_user_id: string | null
           category_pool: Json
           round_index: number
           total_rounds: number
@@ -26,6 +27,7 @@ export type Database = {
           id: string
           status?: RoomStatus
           host_device_id: string
+          host_user_id?: string | null
           category_pool?: Json
           round_index?: number
           total_rounds?: number
@@ -36,6 +38,7 @@ export type Database = {
           id?: string
           status?: RoomStatus
           host_device_id?: string
+          host_user_id?: string | null
           category_pool?: Json
           round_index?: number
           total_rounds?: number
@@ -52,6 +55,8 @@ export type Database = {
           avatar: string
           connected: boolean
           selected_categories: Json
+          created_at: string
+          user_id: string | null
         }
         Insert: {
           id?: string
@@ -60,6 +65,8 @@ export type Database = {
           avatar: string
           connected?: boolean
           selected_categories?: Json
+          created_at?: string
+          user_id?: string | null
         }
         Update: {
           id?: string
@@ -68,6 +75,8 @@ export type Database = {
           avatar?: string
           connected?: boolean
           selected_categories?: Json
+          created_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -82,6 +91,9 @@ export type Database = {
           reveal_order: Json
           results: Json | null
           created_at: string
+          phase: 'prompt' | 'responding' | 'guessing' | 'results'
+          vote_deadline: string | null
+          finalized_at: string | null
         }
         Insert: {
           id?: string
@@ -93,6 +105,9 @@ export type Database = {
           reveal_order?: Json
           results?: Json | null
           created_at?: string
+          phase?: 'prompt' | 'responding' | 'guessing' | 'results'
+          vote_deadline?: string | null
+          finalized_at?: string | null
         }
         Update: {
           id?: string
@@ -104,25 +119,28 @@ export type Database = {
           reveal_order?: Json
           results?: Json | null
           created_at?: string
+          phase?: 'prompt' | 'responding' | 'guessing' | 'results'
+          vote_deadline?: string | null
+          finalized_at?: string | null
         }
         Relationships: []
       }
       submissions: {
-        Row: { id: string; round_id: string; player_id: string; text: string }
-        Insert: { id?: string; round_id: string; player_id: string; text: string }
-        Update: { id?: string; round_id?: string; player_id?: string; text?: string }
+        Row: { id: string; round_id: string; player_id: string; text: string; created_at: string }
+        Insert: { id?: string; round_id: string; player_id: string; text: string; created_at?: string }
+        Update: { id?: string; round_id?: string; player_id?: string; text?: string; created_at?: string }
         Relationships: []
       }
       guesses: {
-        Row: { id: string; round_id: string; player_id: string; answer_id: string }
-        Insert: { id?: string; round_id: string; player_id: string; answer_id: string }
-        Update: { id?: string; round_id?: string; player_id?: string; answer_id?: string }
+        Row: { id: string; round_id: string; player_id: string; answer_id: string; created_at: string }
+        Insert: { id?: string; round_id: string; player_id: string; answer_id: string; created_at?: string }
+        Update: { id?: string; round_id?: string; player_id?: string; answer_id?: string; created_at?: string }
         Relationships: []
       }
       votes: {
-        Row: { id: string; round_id: string; player_id: string; answer_id: string }
-        Insert: { id?: string; round_id: string; player_id: string; answer_id: string }
-        Update: { id?: string; round_id?: string; player_id?: string; answer_id?: string }
+        Row: { id: string; round_id: string; player_id: string; answer_id: string; created_at: string }
+        Insert: { id?: string; round_id: string; player_id: string; answer_id: string; created_at?: string }
+        Update: { id?: string; round_id?: string; player_id?: string; answer_id?: string; created_at?: string }
         Relationships: []
       }
     }

@@ -41,8 +41,10 @@ Baseline cleanup completed locally on 2026-09-29:
 The live Supabase project exists and contains prototype data. A new approved
 browser-safe publishable key restored local access after its recovered keys
 returned HTTP 401. Its schema has been compared with the reconstructed
-migration; see `supabase/LIVE_AUDIT_2026-09-29.md`. Reconcile it before deploying
-a backend.
+migration. A local JSON safety copy and a data-aware reconciliation migration
+are now prepared, and the migration passes both fresh-install and populated
+prototype rehearsals. It has not been applied to the live project. See
+`supabase/LIVE_AUDIT_2026-09-29.md` and `supabase/RECOVERY_RUNBOOK.md`.
 
 ## Fidelity references
 

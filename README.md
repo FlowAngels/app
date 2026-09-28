@@ -31,9 +31,11 @@ Routes:
 npm run build
 npm run lint
 npm test
+npm run test:migrations
 ```
 
-The clean install, build, lint, scoring and category-consensus tests pass as of
-2026-09-29, and `npm audit` reports zero known vulnerabilities. The recovered Supabase
-credentials no longer authenticate; read [`supabase/README.md`](supabase/README.md)
-before connecting or creating a backend.
+The clean install, build, lint, behavior tests, and fresh/populated database
+migration rehearsals pass as of 2026-09-29. `npm audit` reports zero known
+vulnerabilities. A new browser-safe publishable key reconnects the local app to
+the original Supabase project; read
+[`supabase/README.md`](supabase/README.md) before changing the live backend.

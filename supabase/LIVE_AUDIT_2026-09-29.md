@@ -50,13 +50,17 @@ the same player and round, demonstrating the missing uniqueness constraint.
 
 The reconstructed migration intentionally tightens most of these constraints
 and makes `rounds.deadline` nullable to match the recovered two-stage client.
-Do not apply it directly to the populated live database: write an explicit,
-data-aware reconciliation migration after deciding whether the old test rows
-should be retained or archived.
+The explicit data-aware migration
+`20260929010000_reconcile_live_prototype.sql` now preserves all existing rows in
+an access-restricted `archive` schema, removes the one duplicate from the active
+table, and tightens the active schema. It has passed a populated-prototype
+rehearsal but has not been applied live.
 
 ## Access recovery outcome
 
 The local app is reconnected to the original project with a browser-safe key.
-Existing keys were not deliberately revoked or changed. The next database step
-is a data-aware reconciliation migration; do not apply the reconstructed
-baseline migration directly to this populated project.
+Existing keys were not deliberately revoked or changed. A local JSON safety
+copy of all six tables was captured under the ignored `.local-backups/`
+directory. The next live database step is the reviewed reconciliation described
+in `RECOVERY_RUNBOOK.md`; do not apply the reconstructed baseline migration
+directly to this populated project.
