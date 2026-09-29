@@ -36,8 +36,8 @@ through safe interfaces.
 The client-side command cutover is implemented behind the disabled
 `VITE_USE_AUTHENTICATED_COMMANDS` environment flag. Do not enable it until
 anonymous Auth is enabled. `20260929030000_command_hardening.sql` makes clearing
-a favourite transactional as well as selecting one; it is rehearsed locally
-but not yet applied live.
+a favourite transactional as well as selecting one, and recalculates the shared
+category pool on disconnect. It is rehearsed, applied live, and verified.
 
 `20260929040000_secure_reads_and_rls.sql` completes the prepared read boundary
 and enables RLS. It has member, outsider, private-answer, and direct-write

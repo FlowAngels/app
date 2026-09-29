@@ -60,7 +60,9 @@ The client now has an authenticated-command cutover path behind
 `VITE_USE_AUTHENTICATED_COMMANDS`. The switch defaults to false until anonymous
 Auth and read policies are ready, so the existing app remains usable during the
 transition. The secure path covers all material game writes; a follow-up
-migration also preserves the controller's ability to clear a favourite vote.
+migration preserves the controller's ability to clear a favourite vote and
+keeps category consensus correct as players disconnect. That hardening was
+applied and verified live on 2026-09-29.
 
 The coordinated read-security migration is prepared locally in
 `20260929040000_secure_reads_and_rls.sql`. It adds join-safe room previews,

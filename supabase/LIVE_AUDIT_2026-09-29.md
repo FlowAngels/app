@@ -87,3 +87,8 @@ the intended grants: `authenticated` can execute the commands, while `anon` and
 `public` cannot execute them. Anonymous sign-in and RLS remain disabled, so the
 current recovered client behavior is unchanged. A post-deployment REST read
 returned HTTP 200.
+
+The follow-up `20260929030000_command_hardening.sql` was subsequently applied.
+Catalog verification confirmed that favourite votes can be cleared, connection
+changes recompute the category pool, and both authenticated execution grants
+remain present. Auth and RLS were not changed.
