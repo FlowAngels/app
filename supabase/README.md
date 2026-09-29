@@ -37,8 +37,9 @@ enables RLS. Anonymous Auth, this migration, and the client feature switch were
 deployed as one approved coordinated cutover. A live five-session test verified
 room creation/joining, the full round flow, member and outsider visibility,
 private answers, ownership, deadline enforcement, scoring, and idempotency.
-`npm run test:live-secure` repeats that destructive live smoke test and creates
-a temporary room that must be removed afterwards; it is not a routine CI test.
+`npm run test:live-secure` repeats a destructive six-round live smoke test with
+five isolated anonymous sessions and creates a temporary room that must be
+removed afterwards; it is not a routine CI test.
 
 Before sharing a public URL, add CAPTCHA or equivalent abuse protection to both
 Supabase anonymous sign-in and the client. Enabling it only in the dashboard

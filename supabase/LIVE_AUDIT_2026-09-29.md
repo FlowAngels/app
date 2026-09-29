@@ -111,3 +111,13 @@ The active counts returned to 6 rooms, 12 players, 11 rounds, 2 submissions,
 The Supabase dashboard recommends CAPTCHA for anonymous sign-ins. It remains a
 pre-public-launch task because enabling it without implementing the matching
 client token flow would stop the game from signing players in.
+
+## Six-round unattended verification
+
+After the first vertical-slice UI pass, the live security test was expanded to
+six rounds and run with five isolated anonymous sessions. All rounds completed;
+the three Round Owners rotated twice; player and host sessions were replaced
+mid-game; a player disconnected and reconnected; and privacy, outsider denial,
+direct-write rejection, deadline enforcement, scoring, and repeat-safe
+finalisation continued to pass. Temporary room `A9EP` was then removed with its
+dependent rows. Active counts returned to 6, 12, 11, 2, 0, and 0.

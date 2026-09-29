@@ -133,6 +133,15 @@ previously saved favourite before hydration completes. Host phase/deadline
 recovery is present, but the full refresh and disconnect matrix still belongs
 in the multi-device exit test.
 
+An unattended live substitute for that engineering gate passed on 2026-09-29:
+one host, three players, and one outsider completed all six rounds using
+separate anonymous sessions. It verified two full owner rotations, player and
+host session replacement, disconnect/reconnect, private-answer isolation,
+outsider denial, direct-write rejection, deadline enforcement, scoring, and
+idempotent finalisation. The generated room `A9EP` was removed and the original
+live counts were restored. This is strong functional evidence, but it does not
+replace the later human playtest for comprehension, pacing, or fun.
+
 Then run five observed playtests across different relationship types. Continue
 only if at least three groups voluntarily play another game or ask to use it
 again. Treat one excellent personal game night as success; a company is not the
