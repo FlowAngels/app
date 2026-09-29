@@ -31,10 +31,20 @@ export default function Respond({ roomId, playerId }: RespondProps) {
         setRoundId(data.id)
         setDeadline(data.deadline || '')
         setPrompt(parsePrompt(data.prompt))
+        const { data: existingSubmission } = await supabase
+          .from('submissions')
+          .select('text')
+          .eq('round_id', data.id)
+          .eq('player_id', playerId)
+          .maybeSingle()
+        if (existingSubmission) {
+          setText(existingSubmission.text)
+          setSubmitted(true)
+        }
       }
     }
     load()
-  }, [roomId])
+  }, [playerId, roomId])
 
   const msLeft = useMemo(() => {
     if (!deadline) return 0

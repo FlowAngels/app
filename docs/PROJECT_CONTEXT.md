@@ -127,6 +127,12 @@ seventh round. A server-side end-game/replay command remains future work; it
 should not be added to the live project before the six-round playtest justifies
 that extra lifecycle.
 
+Player refresh recovery now restores an existing answer, guess, and favourite
+from the database. In particular, opening the voting screen no longer clears a
+previously saved favourite before hydration completes. Host phase/deadline
+recovery is present, but the full refresh and disconnect matrix still belongs
+in the multi-device exit test.
+
 Then run five observed playtests across different relationship types. Continue
 only if at least three groups voluntarily play another game or ask to use it
 again. Treat one excellent personal game night as success; a company is not the

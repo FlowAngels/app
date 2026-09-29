@@ -16,6 +16,7 @@ export default function GuessVote({ roomId, playerId, items, voteDeadline }: Gue
   const [voteId, setVoteId] = useState<string | null>(null)
   const [ownIds, setOwnIds] = useState<Set<string>>(new Set())
   const [now, setNow] = useState(() => Date.now())
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -34,6 +35,24 @@ export default function GuessVote({ roomId, playerId, items, voteDeadline }: Gue
           .eq('round_id', data.id)
           .eq('player_id', playerId)
         setOwnIds(new Set((mine || []).map(m => m.id)))
+
+        const [{ data: savedGuess }, { data: savedVote }] = await Promise.all([
+          supabase
+            .from('guesses')
+            .select('answer_id')
+            .eq('round_id', data.id)
+            .eq('player_id', playerId)
+            .maybeSingle(),
+          supabase
+            .from('votes')
+            .select('answer_id')
+            .eq('round_id', data.id)
+            .eq('player_id', playerId)
+            .maybeSingle(),
+        ])
+        setGuessId(savedGuess?.answer_id || null)
+        setVoteId(savedVote?.answer_id || null)
+        setHydrated(true)
       }
     }
     load()
@@ -56,7 +75,7 @@ export default function GuessVote({ roomId, playerId, items, voteDeadline }: Gue
 
   useEffect(() => {
     const sync = async () => {
-      if (!roundId) return
+      if (!roundId || !hydrated) return
       try {
         if (guessId) await upsertGuess(roundId, playerId, guessId)
         await setVotes(roundId, playerId, voteId ? [voteId] : [])
@@ -65,7 +84,7 @@ export default function GuessVote({ roomId, playerId, items, voteDeadline }: Gue
       }
     }
     sync()
-  }, [roundId, playerId, guessId, voteId])
+  }, [roundId, playerId, guessId, voteId, hydrated])
 
   const secondsLeft = Math.ceil(msLeft / 1000)
 
