@@ -17,6 +17,10 @@ const commands = await readFile(
   new URL('../supabase/migrations/20260929020000_authenticated_commands.sql', import.meta.url),
   'utf8',
 )
+const commandHardening = await readFile(
+  new URL('../supabase/migrations/20260929030000_command_hardening.sql', import.meta.url),
+  'utf8',
+)
 
 async function prepareAuthSchema(db) {
   await db.exec(`
@@ -115,6 +119,13 @@ async function verifyAuthenticatedCommands(db) {
   )
   await db.query(`select public.whatever_set_guess($1, $2)`, [roundId, submissionIds[1]])
   await db.query(`select public.whatever_set_vote($1, $2)`, [roundId, submissionIds[2]])
+  await db.query(`select public.whatever_set_vote($1, null)`, [roundId])
+  const clearedVotes = await db.query(
+    `select count(*)::int as count from public.votes where round_id = $1 and player_id = $2`,
+    [roundId, playerIds[0]],
+  )
+  assert.equal(clearedVotes.rows[0].count, 0)
+  await db.query(`select public.whatever_set_vote($1, $2)`, [roundId, submissionIds[2]])
 
   await setAuthUser(db, playerUserIds[1])
   await db.query(`select public.whatever_set_guess($1, $2)`, [roundId, submissionIds[0]])
@@ -154,6 +165,7 @@ async function verifyFreshInstall() {
   await db.exec(baseline)
   await db.exec(reconciliation)
   await db.exec(commands)
+  await db.exec(commandHardening)
 
   const tables = await db.query(`
     select table_name
@@ -261,6 +273,7 @@ async function verifyPopulatedPrototypeUpgrade() {
 
   await db.exec(reconciliation)
   await db.exec(commands)
+  await db.exec(commandHardening)
 
   const active = await db.query('select count(*)::int as count from public.submissions')
   const archived = await db.query(

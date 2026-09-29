@@ -56,6 +56,12 @@ rules. The live verification found all 11 functions, both ownership indexes,
 and the intended execution grants. It does not enable RLS or change the
 recovered client yet.
 
+The client now has an authenticated-command cutover path behind
+`VITE_USE_AUTHENTICATED_COMMANDS`. The switch defaults to false until anonymous
+Auth and read policies are ready, so the existing app remains usable during the
+transition. The secure path covers all material game writes; a follow-up
+migration also preserves the controller's ability to clear a favourite vote.
+
 ## Fidelity references
 
 - The nine prompts in `src/lib/prompts.ts` are Claude-generated placeholders,

@@ -33,6 +33,12 @@ functions, both ownership indexes, and their role grants were verified. It
 intentionally leaves RLS disabled until the client reads and writes exclusively
 through safe interfaces.
 
+The client-side command cutover is implemented behind the disabled
+`VITE_USE_AUTHENTICATED_COMMANDS` environment flag. Do not enable it until
+anonymous Auth is enabled. `20260929030000_command_hardening.sql` makes clearing
+a favourite transactional as well as selecting one; it is rehearsed locally
+but not yet applied live.
+
 The migration makes `rounds.deadline` nullable because the current host flow
 creates a round and begins its countdown as two separate actions. It also adds
 `rounds.created_at`, which the recovered client uses to identify the latest

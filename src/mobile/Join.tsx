@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { joinRoom, broadcast, deriveBoardState } from '../lib/orchestrator'
+import { joinRoom, broadcast, deriveBoardState, setPlayerConnected } from '../lib/orchestrator'
 import { supabase } from '../lib/supabase'
 import CategoryOptIn from './CategoryOptIn'
 import Respond from './Respond'
@@ -43,11 +43,7 @@ export default function Join() {
         const playerId = localStorage.getItem('playerId')
         if (playerId && success !== 'left') {
           // Fire-and-forget; may not always complete but improves accuracy
-          supabase
-            .from('players')
-            .update({ connected: false })
-            .eq('id', playerId)
-            .then(() => undefined, () => undefined)
+          void setPlayerConnected(playerId, false).catch(() => undefined)
         }
       } catch {
         // ignore
@@ -222,13 +218,7 @@ export default function Join() {
       const rid = localStorage.getItem('roomId') || roomId || ''
       setLeftRoomId(rid || null)
       if (playerId) {
-        const { error } = await supabase
-          .from('players')
-          .update({ connected: false })
-          .eq('id', playerId)
-        if (error) {
-          console.error('Error leaving room:', error)
-        }
+        await setPlayerConnected(playerId, false)
         // Broadcast so host UI updates even if PG changes are not enabled
         if (rid) {
           try {

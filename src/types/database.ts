@@ -183,7 +183,7 @@ export type Database = {
         Returns: undefined
       }
       whatever_set_vote: {
-        Args: { p_round_id: string; p_answer_id: string }
+        Args: { p_round_id: string; p_answer_id: string | null }
         Returns: undefined
       }
       whatever_finalize_round: {

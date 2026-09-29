@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { broadcast, computeCategoryIntersection } from '../lib/orchestrator'
+import { broadcast, computeCategoryIntersection, setPlayerCategories } from '../lib/orchestrator'
 import { parseStringArray } from '../lib/gameState'
 
 const CATEGORIES = [
@@ -85,14 +85,7 @@ export default function CategoryOptIn({ playerId, roomId, onComplete }: Category
     setIsSubmitting(true)
     
     try {
-      const { error } = await supabase
-        .from('players')
-        .update({ selected_categories: selectedCategories })
-        .eq('id', playerId)
-
-      if (error) {
-        throw error
-      }
+      await setPlayerCategories(playerId, selectedCategories)
 
       // Also broadcast a categories:update so hosts update even if PG changes aren't enabled
       try {

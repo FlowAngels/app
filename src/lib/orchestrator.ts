@@ -3,6 +3,8 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { getPrompt } from './prompts'
 import { intersectCategorySelections, parseLeaderboards, parseStringArray } from './gameState'
 import { scoreRound } from './scoring'
+import { ensureAnonymousSession } from './auth'
+import { useAuthenticatedCommands } from './backendMode'
 
 // Keep a per-room channel so we can reliably send/receive
 const roomChannels = new Map<string, RealtimeChannel>()
@@ -30,6 +32,15 @@ function generateRoomCode(): string {
 
 // Create a new room and return the room ID
 export async function createRoom(hostDeviceId: string): Promise<{ id: string }> {
+  if (useAuthenticatedCommands) {
+    await ensureAnonymousSession()
+    const { data, error } = await supabase.rpc('whatever_create_room', {
+      p_host_device_id: hostDeviceId,
+    })
+    if (error || !data) throw new Error(error?.message || 'Failed to create room')
+    return { id: data }
+  }
+
   let roomId = generateRoomCode()
   let attempts = 0
   
@@ -70,6 +81,17 @@ export async function createRoom(hostDeviceId: string): Promise<{ id: string }> 
 
 // Join a room as a player
 export async function joinRoom(roomId: string, name: string, avatar: string): Promise<{ playerId: string }> {
+  if (useAuthenticatedCommands) {
+    await ensureAnonymousSession()
+    const { data, error } = await supabase.rpc('whatever_join_room', {
+      p_room_id: roomId,
+      p_name: name,
+      p_avatar: avatar,
+    })
+    if (error || !data) throw new Error(error?.message || 'Failed to join room')
+    return { playerId: data }
+  }
+
   // First check if room exists and is joinable
   const { data: room, error: roomError } = await supabase
     .from('rooms')
@@ -179,6 +201,43 @@ export async function updateCategoryPool(roomId: string): Promise<void> {
   if (error) {
     throw new Error(`Failed to update category pool: ${error.message}`)
   }
+}
+
+export async function setPlayerCategories(
+  playerId: string,
+  categories: string[],
+): Promise<void> {
+  if (useAuthenticatedCommands) {
+    await ensureAnonymousSession()
+    const { error } = await supabase.rpc('whatever_set_categories', {
+      p_player_id: playerId,
+      p_categories: categories,
+    })
+    if (error) throw new Error(error.message)
+    return
+  }
+  const { error } = await supabase
+    .from('players')
+    .update({ selected_categories: categories })
+    .eq('id', playerId)
+  if (error) throw new Error(error.message)
+}
+
+export async function setPlayerConnected(playerId: string, connected: boolean): Promise<void> {
+  if (useAuthenticatedCommands) {
+    await ensureAnonymousSession()
+    const { error } = await supabase.rpc('whatever_set_connected', {
+      p_player_id: playerId,
+      p_connected: connected,
+    })
+    if (error) throw new Error(error.message)
+    return
+  }
+  const { error } = await supabase
+    .from('players')
+    .update({ connected })
+    .eq('id', playerId)
+  if (error) throw new Error(error.message)
 }
 
 // Derive current board state for a room
@@ -320,6 +379,19 @@ export async function startRound(roomId: string, opts?: { category?: string; pro
   if (pool.length === 0 && !opts?.category) throw new Error('No categories available')
   const category = opts?.category || pool[0]
 
+  const promptText = opts?.promptText || getPrompt(category)
+  if (useAuthenticatedCommands) {
+    await ensureAnonymousSession()
+    const { data, error } = await supabase.rpc('whatever_start_round', {
+      p_room_id: roomId,
+      p_category: category,
+      p_prompt_text: promptText,
+    })
+    if (error || !data) throw new Error(error?.message || 'Failed to start round')
+    await broadcast(roomId, 'round:start', { roundId: data, category, prompt: promptText })
+    return { roundId: data }
+  }
+
   // Choose round owner by rotation among connected players (sorted by name)
   const { data: pl } = await supabase
     .from('players')
@@ -331,7 +403,6 @@ export async function startRound(roomId: string, opts?: { category?: string; pro
   const ownerId = sortedPl.length > 0 ? sortedPl[idx].id : null
 
   // Insert round without deadline initially
-  const promptText = opts?.promptText || getPrompt(category)
   const { data: round, error: roundErr } = await supabase
     .from('rounds')
     .insert({ room_id: roomId, category, prompt: { text: promptText }, owner_id: ownerId })
@@ -359,6 +430,16 @@ export async function beginRoundCountdown(roomId: string): Promise<{ deadline: s
     .single()
   if (roundErr || !round) throw new Error('No active round found')
 
+  if (useAuthenticatedCommands) {
+    await ensureAnonymousSession()
+    const { data, error } = await supabase.rpc('whatever_begin_round', {
+      p_round_id: round.id,
+    })
+    if (error || !data) throw new Error(error?.message || 'Failed to set round deadline')
+    await broadcast(roomId, 'round:countdown_start', { roundId: round.id, deadline: data })
+    return { deadline: data }
+  }
+
   // Set 60s deadline
   const deadline = new Date(Date.now() + 60 * 1000).toISOString()
   const { error: updateErr } = await supabase
@@ -377,6 +458,21 @@ export async function submitAnswer(roundId: string, playerId: string, text: stri
   const trimmed = (text || '').trim()
   if (trimmed.length === 0 || trimmed.length > 100) {
     throw new Error('Answer must be 1-100 characters')
+  }
+  if (useAuthenticatedCommands) {
+    await ensureAnonymousSession()
+    const { error } = await supabase.rpc('whatever_submit_answer', {
+      p_round_id: roundId,
+      p_text: trimmed,
+    })
+    if (error) throw new Error(error.message)
+    const { data: round } = await supabase
+      .from('rounds')
+      .select('room_id')
+      .eq('id', roundId)
+      .single()
+    if (round?.room_id) await broadcast(round.room_id, 'round:submit', { playerId })
+    return
   }
   const { error } = await supabase
     .from('submissions')
@@ -406,6 +502,23 @@ export async function revealRound(roomId: string): Promise<{ items: { id: string
     .single()
   if (!round) throw new Error('No round to reveal')
 
+  if (useAuthenticatedCommands) {
+    await ensureAnonymousSession()
+    const { data, error } = await supabase.rpc('whatever_reveal_round', {
+      p_round_id: round.id,
+    })
+    if (error) throw new Error(error.message)
+    const items = Array.isArray(data)
+      ? data.filter(
+          (item): item is { id: string; text: string } =>
+            typeof item === 'object' && item !== null && !Array.isArray(item) &&
+            typeof item.id === 'string' && typeof item.text === 'string',
+        )
+      : []
+    await broadcast(roomId, 'round:reveal', { roundId: round.id, items })
+    return { items }
+  }
+
   const { data: subs } = await supabase
     .from('submissions')
     .select('id, text')
@@ -430,6 +543,20 @@ export async function revealRound(roomId: string): Promise<{ items: { id: string
 
 // Begin combined Guess+Vote phase (30s)
 export async function startVotePhase(roomId: string): Promise<{ voteDeadline: string }> {
+  if (useAuthenticatedCommands) {
+    const { data: round, error } = await supabase
+      .from('rounds')
+      .select('vote_deadline')
+      .eq('room_id', roomId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    if (error || !round?.vote_deadline) {
+      throw new Error(error?.message || 'Vote deadline is missing')
+    }
+    await broadcast(roomId, 'round:vote_start', { voteDeadline: round.vote_deadline })
+    return { voteDeadline: round.vote_deadline }
+  }
   const voteDeadline = new Date(Date.now() + 30 * 1000).toISOString()
   await broadcast(roomId, 'round:vote_start', { voteDeadline })
   return { voteDeadline }
@@ -437,6 +564,16 @@ export async function startVotePhase(roomId: string): Promise<{ voteDeadline: st
 
 // Upsert guess (single) for player
 export async function upsertGuess(roundId: string, playerId: string, submissionId: string): Promise<void> {
+  if (useAuthenticatedCommands) {
+    await ensureAnonymousSession()
+    const { error } = await supabase.rpc('whatever_set_guess', {
+      p_round_id: roundId,
+      p_answer_id: submissionId,
+    })
+    if (error) throw new Error(error.message)
+    return
+  }
+
   // Remove existing guess
   await supabase.from('guesses').delete().eq('round_id', roundId).eq('player_id', playerId)
   // Insert new
@@ -447,6 +584,15 @@ export async function upsertGuess(roundId: string, playerId: string, submissionI
 // Set a player's single favourite vote.
 export async function setVotes(roundId: string, playerId: string, submissionIds: string[]): Promise<void> {
   const answerId = submissionIds[0]
+  if (useAuthenticatedCommands) {
+    await ensureAnonymousSession()
+    const { error } = await supabase.rpc('whatever_set_vote', {
+      p_round_id: roundId,
+      p_answer_id: answerId || null,
+    })
+    if (error) throw new Error(error.message)
+    return
+  }
   // Replace set
   await supabase.from('votes').delete().eq('round_id', roundId).eq('player_id', playerId)
   if (!answerId) return
@@ -469,6 +615,21 @@ export async function finalizeRound(roomId: string): Promise<{ ownerAnswerId: st
     .limit(1)
     .single()
   if (!round) throw new Error('No round found')
+
+  if (useAuthenticatedCommands) {
+    await ensureAnonymousSession()
+    const { data, error } = await supabase.rpc('whatever_finalize_round', {
+      p_round_id: round.id,
+    })
+    if (error) throw new Error(error.message)
+    const results = data as {
+      ownerAnswerId: string | null
+      correctGuessers: string[]
+      voteCounts: Record<string, number>
+    }
+    await broadcast(roomId, 'round:results', results)
+    return results
+  }
 
   // Submissions map
   const { data: subs } = await supabase
