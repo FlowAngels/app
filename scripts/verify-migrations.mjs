@@ -87,12 +87,23 @@ async function verifyAuthenticatedCommands(db) {
         /Invalid category selection/,
       )
     }
+    const selectedCategories = index === 0
+      ? ['headline_hijack']
+      : ['headline_hijack', 'meme_mash']
     const categories = await db.query(
       `select public.whatever_set_categories($1, $2::text[]) as pool`,
-      [playerIds[index], ['headline_hijack']],
+      [playerIds[index], selectedCategories],
     )
     assert.deepEqual(categories.rows[0].pool, ['headline_hijack'])
   }
+
+  await setAuthUser(db, playerUserIds[0])
+  await db.query(`select public.whatever_set_connected($1, false)`, [playerIds[0]])
+  const disconnectedPool = await db.query(`select category_pool from public.rooms where id = $1`, [roomId])
+  assert.deepEqual(disconnectedPool.rows[0].category_pool, ['headline_hijack', 'meme_mash'])
+  await db.query(`select public.whatever_set_connected($1, true)`, [playerIds[0]])
+  const reconnectedPool = await db.query(`select category_pool from public.rooms where id = $1`, [roomId])
+  assert.deepEqual(reconnectedPool.rows[0].category_pool, ['headline_hijack'])
 
   await setAuthUser(db, hostUserId)
   const started = await db.query(

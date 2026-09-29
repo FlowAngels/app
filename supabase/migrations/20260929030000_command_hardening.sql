@@ -3,6 +3,47 @@
 
 begin;
 
+create or replace function public.whatever_set_connected(
+  p_player_id uuid,
+  p_connected boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_room_id text;
+  v_pool jsonb;
+begin
+  perform private.require_user();
+  update public.players
+  set connected = p_connected
+  where id = p_player_id and user_id = auth.uid()
+  returning room_id into v_room_id;
+  if not found then
+    raise exception 'Player access required' using errcode = '42501';
+  end if;
+
+  select coalesce(jsonb_agg(category order by category), '[]'::jsonb)
+  into v_pool
+  from unnest(array['headline_hijack', 'law_or_nah', 'meme_mash']) category
+  where exists (
+    select 1 from public.players p
+    where p.room_id = v_room_id and p.connected
+  )
+  and not exists (
+    select 1
+    from public.players p
+    where p.room_id = v_room_id
+      and p.connected
+      and not (p.selected_categories ? category)
+  );
+
+  update public.rooms set category_pool = v_pool where id = v_room_id;
+end;
+$$;
+
 create or replace function public.whatever_set_vote(p_round_id uuid, p_answer_id uuid)
 returns void
 language plpgsql
@@ -40,6 +81,8 @@ end;
 $$;
 
 revoke all on function public.whatever_set_vote(uuid, uuid) from public, anon;
+revoke all on function public.whatever_set_connected(uuid, boolean) from public, anon;
 grant execute on function public.whatever_set_vote(uuid, uuid) to authenticated;
+grant execute on function public.whatever_set_connected(uuid, boolean) to authenticated;
 
 commit;
