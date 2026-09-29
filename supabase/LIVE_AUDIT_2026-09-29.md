@@ -77,3 +77,13 @@ phase, nullable staged-round deadline, and per-player/per-round uniqueness for
 submissions, guesses, and votes. All seven checks returned true. The configured
 publishable key subsequently read the reconciled REST API with HTTP 200,
 including the new `host_user_id` column.
+
+## Authenticated command layer
+
+After a local end-to-end rehearsal and Tim's explicit approval,
+`20260929020000_authenticated_commands.sql` was applied live. Verification
+confirmed 11 `whatever_*` command functions, both player ownership indexes, and
+the intended grants: `authenticated` can execute the commands, while `anon` and
+`public` cannot execute them. Anonymous sign-in and RLS remain disabled, so the
+current recovered client behavior is unchanged. A post-deployment REST read
+returned HTTP 200.
