@@ -21,6 +21,10 @@ const commandHardening = await readFile(
   new URL('../supabase/migrations/20260929030000_command_hardening.sql', import.meta.url),
   'utf8',
 )
+const secureReads = await readFile(
+  new URL('../supabase/migrations/20260929040000_secure_reads_and_rls.sql', import.meta.url),
+  'utf8',
+)
 
 async function prepareAuthSchema(db) {
   await db.exec(`
@@ -156,6 +160,32 @@ async function verifyAuthenticatedCommands(db) {
   assert.deepEqual(finalizedAgain.rows[0].results, finalized.rows[0].results)
   const unchanged = await db.query(`select round_index from public.rooms where id = $1`, [roomId])
   assert.equal(unchanged.rows[0].round_index, 1)
+
+  await setAuthUser(db, playerUserIds[0])
+  await db.exec(`set role authenticated`)
+  const visibleRoom = await db.query(`select count(*)::int as count from public.rooms`)
+  assert.equal(visibleRoom.rows[0].count, 1)
+  const ownSubmission = await db.query(`select count(*)::int as count from public.submissions`)
+  assert.equal(ownSubmission.rows[0].count, 1)
+  const revealItems = await db.query(`select public.whatever_reveal_items($1) as items`, [roundId])
+  assert.equal(revealItems.rows[0].items.length, 3)
+  await assert.rejects(
+    db.query(`insert into public.rooms (id, host_device_id) values ('NOPE', 'device-blocked')`),
+    /permission denied/,
+  )
+  await db.exec(`reset role`)
+
+  await setAuthUser(db, 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')
+  await db.exec(`set role authenticated`)
+  const hiddenRooms = await db.query(`select count(*)::int as count from public.rooms`)
+  assert.equal(hiddenRooms.rows[0].count, 0)
+  const preview = await db.query(`select public.whatever_room_preview($1) as room`, [roomId])
+  assert.equal(preview.rows[0].room.playerCount, 3)
+  await assert.rejects(
+    db.query(`select public.whatever_reveal_items($1)`, [roundId]),
+    /Room access required/,
+  )
+  await db.exec(`reset role`)
 }
 
 async function verifyFreshInstall() {
@@ -166,6 +196,7 @@ async function verifyFreshInstall() {
   await db.exec(reconciliation)
   await db.exec(commands)
   await db.exec(commandHardening)
+  await db.exec(secureReads)
 
   const tables = await db.query(`
     select table_name
@@ -274,6 +305,7 @@ async function verifyPopulatedPrototypeUpgrade() {
   await db.exec(reconciliation)
   await db.exec(commands)
   await db.exec(commandHardening)
+  await db.exec(secureReads)
 
   const active = await db.query('select count(*)::int as count from public.submissions')
   const archived = await db.query(

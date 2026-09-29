@@ -173,6 +173,7 @@ export async function broadcast(roomId: string, type: string, payload: unknown):
 
 // Compute category intersection for a room
 export async function computeCategoryIntersection(roomId: string): Promise<string[]> {
+  if (useAuthenticatedCommands) await ensureAnonymousSession()
   // Get all connected players in room with their selected categories
   const { data: players, error } = await supabase
     .from('players')
@@ -191,6 +192,7 @@ export async function computeCategoryIntersection(roomId: string): Promise<strin
 
 // Update room's category pool
 export async function updateCategoryPool(roomId: string): Promise<void> {
+  if (useAuthenticatedCommands) return
   const categoryPool = await computeCategoryIntersection(roomId)
   
   const { error } = await supabase
@@ -242,6 +244,7 @@ export async function setPlayerConnected(playerId: string, connected: boolean): 
 
 // Derive current board state for a room
 export async function deriveBoardState(roomId: string) {
+  if (useAuthenticatedCommands) await ensureAnonymousSession()
   // Get room info
   const { data: room, error: roomError } = await supabase
     .from('rooms')
@@ -281,21 +284,34 @@ export async function deriveBoardState(roomId: string) {
   let submittedPlayerIds: string[] = []
   let currentSubmissions: { id: string; text: string; player_id: string }[] = []
   if (currentRound?.id) {
-    const { count } = await supabase
-      .from('submissions')
-      .select('*', { count: 'exact', head: true })
-      .eq('round_id', currentRound.id)
-    submissionCount = count || 0
-    const { data: submitted } = await supabase
-      .from('submissions')
-      .select('player_id')
-      .eq('round_id', currentRound.id)
-    submittedPlayerIds = (submitted || []).map((submission) => submission.player_id)
-    const { data: subs } = await supabase
-      .from('submissions')
-      .select('id, text, player_id')
-      .eq('round_id', currentRound.id)
-    currentSubmissions = subs || []
+    if (useAuthenticatedCommands) {
+      const { data, error } = await supabase.rpc('whatever_submission_progress', {
+        p_round_id: currentRound.id,
+      })
+      if (error) throw new Error(error.message)
+      if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
+        submissionCount = typeof data.count === 'number' ? data.count : 0
+        submittedPlayerIds = Array.isArray(data.playerIds)
+          ? data.playerIds.filter((id): id is string => typeof id === 'string')
+          : []
+      }
+    } else {
+      const { count } = await supabase
+        .from('submissions')
+        .select('*', { count: 'exact', head: true })
+        .eq('round_id', currentRound.id)
+      submissionCount = count || 0
+      const { data: submitted } = await supabase
+        .from('submissions')
+        .select('player_id')
+        .eq('round_id', currentRound.id)
+      submittedPlayerIds = (submitted || []).map((submission) => submission.player_id)
+      const { data: subs } = await supabase
+        .from('submissions')
+        .select('id, text, player_id')
+        .eq('round_id', currentRound.id)
+      currentSubmissions = subs || []
+    }
   }
   
   // Sort players alphabetically by name (case-insensitive)
@@ -314,6 +330,65 @@ export async function deriveBoardState(roomId: string) {
     submittedPlayerIds,
     currentSubmissions
   }
+}
+
+export async function getRoomPreview(roomId: string): Promise<{
+  id: string
+  status: string
+  avatars: string[]
+  playerCount: number
+}> {
+  if (useAuthenticatedCommands) {
+    await ensureAnonymousSession()
+    const { data, error } = await supabase.rpc('whatever_room_preview', {
+      p_room_id: roomId,
+    })
+    if (error || typeof data !== 'object' || data === null || Array.isArray(data)) {
+      throw new Error(error?.message || 'Room not found')
+    }
+    return {
+      id: typeof data.id === 'string' ? data.id : roomId,
+      status: typeof data.status === 'string' ? data.status : '',
+      avatars: Array.isArray(data.avatars)
+        ? data.avatars.filter((avatar): avatar is string => typeof avatar === 'string')
+        : [],
+      playerCount: typeof data.playerCount === 'number' ? data.playerCount : 0,
+    }
+  }
+  const { data: room, error: roomError } = await supabase
+    .from('rooms')
+    .select('id, status')
+    .eq('id', roomId)
+    .single()
+  if (roomError || !room) throw new Error('Room not found')
+  const { data: players, error: playersError } = await supabase
+    .from('players')
+    .select('avatar')
+    .eq('room_id', roomId)
+    .eq('connected', true)
+  if (playersError) throw new Error(playersError.message)
+  return {
+    id: room.id,
+    status: room.status,
+    avatars: (players || []).map((player) => player.avatar),
+    playerCount: players?.length || 0,
+  }
+}
+
+export async function getRevealItems(roundId: string): Promise<{ id: string; text: string }[]> {
+  if (!useAuthenticatedCommands) return []
+  await ensureAnonymousSession()
+  const { data, error } = await supabase.rpc('whatever_reveal_items', {
+    p_round_id: roundId,
+  })
+  if (error) throw new Error(error.message)
+  return Array.isArray(data)
+    ? data.filter(
+        (item): item is { id: string; text: string } =>
+          typeof item === 'object' && item !== null && !Array.isArray(item) &&
+          typeof item.id === 'string' && typeof item.text === 'string',
+      )
+    : []
 }
 
 // Subscribe to room updates

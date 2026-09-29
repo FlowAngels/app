@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { joinRoom, broadcast, deriveBoardState, setPlayerConnected } from '../lib/orchestrator'
+import {
+  joinRoom,
+  broadcast,
+  deriveBoardState,
+  getRevealItems,
+  getRoomPreview,
+  setPlayerConnected,
+} from '../lib/orchestrator'
 import { supabase } from '../lib/supabase'
 import CategoryOptIn from './CategoryOptIn'
 import Respond from './Respond'
@@ -100,7 +107,13 @@ export default function Join() {
 
         // Determine phase based on current round state
         if (boardState.currentRound) {
-          if (boardState.currentRound.deadline) {
+          if (boardState.currentRound.phase === 'guessing') {
+            setRevealItems(await getRevealItems(boardState.currentRound.id))
+            setVoteDeadline(boardState.currentRound.vote_deadline || undefined)
+            setPhase('guessvote')
+          } else if (boardState.currentRound.phase === 'results') {
+            setPhase('results')
+          } else if (boardState.currentRound.deadline) {
             // Round is active with countdown
             setPhase('respond')
           } else {
@@ -123,18 +136,8 @@ export default function Join() {
     if (!roomId) return
 
     try {
-      const { data: players, error } = await supabase
-        .from('players')
-        .select('avatar')
-        .eq('room_id', roomId)
-        .eq('connected', true)
-
-      if (error) {
-        console.error('Error fetching taken colors:', error)
-        return
-      }
-
-      const taken = players?.map(player => player.avatar) || []
+      const preview = await getRoomPreview(roomId)
+      const taken = preview.avatars
       setTakenColors(taken)
 
       // If selected color is taken, select first available

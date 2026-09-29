@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { createRoom } from '../lib/orchestrator'
+import { ensureAnonymousSession } from '../lib/auth'
+import { useAuthenticatedCommands } from '../lib/backendMode'
 
 export default function SplashScreen() {
   const navigate = useNavigate()
@@ -10,6 +12,7 @@ export default function SplashScreen() {
 
   useEffect(() => {
     const init = async () => {
+      if (useAuthenticatedCommands) await ensureAnonymousSession()
       // Stable host device id
       let hostDeviceId = localStorage.getItem('hostDeviceId')
       if (!hostDeviceId) {

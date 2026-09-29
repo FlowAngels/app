@@ -39,6 +39,12 @@ anonymous Auth is enabled. `20260929030000_command_hardening.sql` makes clearing
 a favourite transactional as well as selecting one; it is rehearsed locally
 but not yet applied live.
 
+`20260929040000_secure_reads_and_rls.sql` completes the prepared read boundary
+and enables RLS. It has member, outsider, private-answer, and direct-write
+rejection coverage in the migration rehearsal. Do not apply it independently:
+anonymous Auth, this migration, and the client feature switch form one
+coordinated cutover.
+
 The migration makes `rounds.deadline` nullable because the current host flow
 creates a round and begins its countdown as two separate actions. It also adds
 `rounds.created_at`, which the recovered client uses to identify the latest

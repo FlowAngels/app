@@ -190,6 +190,18 @@ export type Database = {
         Args: { p_round_id: string }
         Returns: Json
       }
+      whatever_room_preview: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
+      whatever_submission_progress: {
+        Args: { p_round_id: string }
+        Returns: Json
+      }
+      whatever_reveal_items: {
+        Args: { p_round_id: string }
+        Returns: Json
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>

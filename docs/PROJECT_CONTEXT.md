@@ -62,6 +62,13 @@ Auth and read policies are ready, so the existing app remains usable during the
 transition. The secure path covers all material game writes; a follow-up
 migration also preserves the controller's ability to clear a favourite vote.
 
+The coordinated read-security migration is prepared locally in
+`20260929040000_secure_reads_and_rls.sql`. It adds join-safe room previews,
+submission progress without answer leakage, refreshable anonymous reveal items,
+member-scoped reads, and RLS policies that deny direct writes. The migration
+rehearsal verifies that members see only permitted rows, outsiders cannot read
+rooms or revealed answers, and direct inserts are rejected. It is not live.
+
 ## Fidelity references
 
 - The nine prompts in `src/lib/prompts.ts` are Claude-generated placeholders,
