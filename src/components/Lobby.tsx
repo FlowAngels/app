@@ -8,6 +8,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { parseLeaderboards, parsePrompt, parseRoomEvent, parseRoundResults, parseStringArray } from '../lib/gameState'
 import type { Leaderboards, RevealItem, RoundResults } from '../lib/gameState'
+import CountdownClock from './CountdownClock'
 
 const COLORS = [
   { name: 'Red', value: '🔴', hex: '#ef4444' },
@@ -19,17 +20,6 @@ const COLORS = [
   { name: 'Pink', value: '🩷', hex: '#ec4899' },
   { name: 'Teal', value: '🩵', hex: '#14b8a6' }
 ]
-
-function RoundCountdown({ deadline }: { deadline: string }) {
-  const [now, setNow] = useState(Date.now())
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 500)
-    return () => clearInterval(t)
-  }, [])
-  const msLeft = Math.max(0, new Date(deadline).getTime() - now)
-  const s = Math.ceil(msLeft / 1000)
-  return <span>Time left: <span className="font-semibold">{s}s</span></span>
-}
 
 export default function Lobby() {
   const [searchParams] = useSearchParams()
@@ -940,7 +930,7 @@ export default function Lobby() {
                   Waiting for responses…
                   <span className="ml-2 text-sm text-gray-300">Submissions: <span className="font-semibold">{submissionCount}</span> / {players.length}</span>
                 </div>
-                <RoundCountdown deadline={roundDeadline} />
+                <CountdownClock deadline={roundDeadline} totalSeconds={60} label="Answer" />
               </div>
             )}
           </div>
@@ -953,7 +943,7 @@ export default function Lobby() {
               <div className="text-sm font-bold uppercase tracking-[0.3em] text-cyan-300">Round {roundIndex + 1} · The reveal</div>
               <h2 className="mt-3 text-3xl font-black md:text-5xl">Which answer sounds like {owner?.name || 'the Round Owner'}?</h2>
               <p className="mt-3 text-slate-300">Players are guessing the owner and choosing the answer they loved most.</p>
-              {voteDeadline && <div className="mt-4 text-lg text-amber-300"><RoundCountdown deadline={voteDeadline} /></div>}
+              {voteDeadline && <div className="mt-4 flex justify-center"><CountdownClock deadline={voteDeadline} totalSeconds={20} label="Vote" /></div>}
             </div>
             <div className="grid gap-4 p-6 md:grid-cols-2">
               {revealItems.map((item, index) => (

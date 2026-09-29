@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { submitAnswer } from '../lib/orchestrator'
 import { parsePrompt } from '../lib/gameState'
+import { MobileCountdown } from '../components/CountdownClock'
 
 interface RespondProps {
   roomId: string
@@ -96,24 +97,24 @@ export default function Respond({ roomId, playerId }: RespondProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white p-6 rounded-lg shadow w-full max-w-md">
+    <div className="relative min-h-screen bg-slate-950 flex items-center justify-center p-4 text-white">
+      <div className="absolute right-4 top-4"><MobileCountdown seconds={secondsLeft} /></div>
+      <div className="w-full max-w-md rounded-3xl border border-cyan-400/20 bg-slate-900 p-6 pt-8 shadow-2xl">
         <h1 className="text-xl font-semibold mb-2">Submit your answer</h1>
-        {prompt && <p className="text-sm text-gray-700 mb-2">Prompt: <span className="font-medium">{prompt}</span></p>}
-        <p className="text-sm text-gray-500 mb-4">Time left: {secondsLeft}s</p>
+        {prompt && <p className="mb-4 text-sm text-slate-300">Prompt: <span className="font-medium text-white">{prompt}</span></p>}
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={100}
           rows={4}
-          className="w-full border rounded p-3 mb-2"
+          className="mb-2 w-full rounded-xl border border-white/15 bg-slate-950 p-3 text-white"
           placeholder="Type up to 100 characters"
         />
-        <div className="text-xs text-gray-500 mb-3">{text.length}/100</div>
+        <div className="mb-3 text-xs text-slate-500">{text.length}/100</div>
         <button
           onClick={handleSubmit}
           disabled={disabled}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 rounded"
+          className="w-full rounded-xl bg-fuchsia-600 py-3 font-bold text-white hover:bg-fuchsia-500 disabled:bg-slate-700 disabled:text-slate-400"
         >
           {submitting ? 'Submitting...' : 'Submit'}
         </button>

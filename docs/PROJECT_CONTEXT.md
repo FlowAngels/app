@@ -186,6 +186,9 @@ guessing and favourite choices. Voting is presented as two simple steps—spot
 the Round Owner, then pick a favourite—instead of placing two competing actions
 on every answer card. The post-round phone recap shows the Round Owner, both
 round winners, running point totals, and the player's rank on both leaderboards.
+Timed phases now use a prominent circular countdown on the shared TV and a
+compact top-corner countdown on phones. Both turn urgent in the final ten
+seconds, keeping the deadline legible without competing with the phone task.
 
 `20260929050000_round_scoring_and_results.sql` prepares the agreed +1 decoy
 award and persists post-reveal answer ownership plus per-round point awards so

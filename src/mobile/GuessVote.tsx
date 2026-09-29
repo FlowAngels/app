@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { upsertGuess, setVotes } from '../lib/orchestrator'
+import { MobileCountdown } from '../components/CountdownClock'
 
 interface Item { id: string; text: string }
 interface GuessVoteProps {
@@ -99,11 +100,9 @@ export default function GuessVote({ roomId, playerId, items, voteDeadline }: Gue
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 p-4 text-white">
-      <div className="mx-auto max-w-md">
-        {voteDeadline && (
-          <div className="mb-3 text-center text-sm font-bold text-amber-300">Time left: {secondsLeft}s</div>
-        )}
+    <div className="relative min-h-screen bg-slate-950 p-4 text-white">
+      {voteDeadline && <div className="absolute right-4 top-4"><MobileCountdown seconds={secondsLeft} /></div>}
+      <div className="mx-auto max-w-md pt-12">
         <div className="mb-5 grid grid-cols-2 rounded-2xl border border-white/10 bg-white/5 p-1 text-sm font-black">
           <button
             disabled={isRoundOwner}

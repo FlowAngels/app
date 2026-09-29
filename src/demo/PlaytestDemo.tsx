@@ -27,6 +27,19 @@ const phaseLabels: Record<DemoPhase, string> = {
   champions: 'Final champions',
 }
 
+function DemoCountdown({ seconds, label }: { seconds: number; label: string }) {
+  const radius = 38
+  const circumference = 2 * Math.PI * radius
+  const progress = seconds / (label === 'Vote' ? 20 : 60)
+  return <div className="relative h-20 w-20 drop-shadow-[0_0_20px_rgba(34,211,238,.35)]">
+    <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" aria-hidden="true">
+      <circle cx="50" cy="50" r={radius} fill="rgba(2,6,23,.88)" stroke="rgba(255,255,255,.12)" strokeWidth="7" />
+      <circle cx="50" cy="50" r={radius} fill="none" stroke={seconds <= 10 ? '#fb7185' : '#22d3ee'} strokeWidth="8" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - progress)} />
+    </svg>
+    <div className="absolute inset-0 grid place-items-center text-center"><div><div className="text-xl font-black">{seconds}</div><div className="text-[0.45rem] font-black uppercase tracking-widest text-slate-400">{label}</div></div></div>
+  </div>
+}
+
 function Phone({ playerIndex, phase, roundNumber }: { playerIndex: number; phase: DemoPhase; roundNumber?: number }) {
   const player = players[playerIndex]
   const round = demoRounds[(roundNumber ?? 1) - 1]
@@ -45,7 +58,10 @@ function Phone({ playerIndex, phase, roundNumber }: { playerIndex: number; phase
   return (
     <div className="mx-auto min-h-[29rem] w-full max-w-[16rem] overflow-hidden rounded-[2rem] border-[5px] border-slate-800 bg-slate-950 text-white shadow-xl">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-xs text-slate-400">
-        <span>{player.avatar} {player.name}</span><span>Room DEMO</span>
+        <span>{player.avatar} {player.name}</span>
+        {(phase === 'answering' || phase === 'voting')
+          ? <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2.5 py-1 font-black tabular-nums text-amber-300">{phase === 'answering' ? '42s' : '18s'}</span>
+          : <span>Room DEMO</span>}
       </div>
       <div className="p-4">
         {phase === 'lobby' && <>
@@ -61,7 +77,7 @@ function Phone({ playerIndex, phase, roundNumber }: { playerIndex: number; phase
           <div className="mt-8 animate-pulse text-center text-5xl">3</div>
         </>}
         {phase === 'answering' && <>
-          <div className="text-xs font-black uppercase tracking-widest text-cyan-300">Round {roundNumber} · Headline Hijack · 42s</div>
+          <div className="text-xs font-black uppercase tracking-widest text-cyan-300">Round {roundNumber} · Headline Hijack</div>
           <p className="mt-4 text-lg font-bold">{round.prompt}</p>
           <div className="mt-5 min-h-28 rounded-xl border border-cyan-400/30 bg-white/5 p-3 text-sm">{answer}</div>
           <div className="mt-2 text-right text-xs text-slate-500">{answer.length}/100</div>
@@ -134,6 +150,7 @@ function TvBoard({ phase, roundNumber }: { phase: DemoPhase; roundNumber?: numbe
           <span className="text-lg font-black tracking-[0.08em]"><span className="text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,.8)]">WHAT</span><span className="text-fuchsia-300 drop-shadow-[0_0_8px_rgba(244,114,182,.8)]">EVER!</span></span>
           <span>Room DEMO · {phaseLabels[phase]}</span>
         </div>
+        {(phase === 'answering' || phase === 'voting') && <div className="absolute right-4 top-14 z-20 md:right-7"><DemoCountdown seconds={phase === 'answering' ? 42 : 18} label={phase === 'answering' ? 'Answer' : 'Vote'} /></div>}
         {phase === 'lobby' && <div className="relative z-10 grid min-h-0 flex-1 grid-cols-[0.82fr_1.18fr] items-center gap-5 pt-4 md:gap-8">
           <div className="flex h-full min-h-0 flex-col items-center justify-center rounded-3xl border border-white/10 bg-black/20 px-5 py-4 text-center shadow-inner">
             <div className="text-[0.65rem] font-black uppercase tracking-[0.32em] text-amber-300">Join the chaos</div>
@@ -164,12 +181,12 @@ function TvBoard({ phase, roundNumber }: { phase: DemoPhase; roundNumber?: numbe
           </div>
         </div>}
         {(phase === 'prompt' || phase === 'answering') && <div className="grid flex-1 place-items-center text-center">
-          <div><div className="text-sm font-black uppercase tracking-[0.3em] text-amber-300">Headline Hijack · Round {roundNumber} of 6</div><h2 className="mt-6 text-4xl font-black md:text-6xl">{round.prompt}</h2><p className="mt-6 text-xl text-slate-300">{phase === 'prompt' ? `Round Owner: ${owner.name}` : '3 of 3 answers received · 42s'}</p></div>
+          <div className={phase === 'answering' ? 'mr-16 md:mr-20' : ''}><div className="text-sm font-black uppercase tracking-[0.3em] text-amber-300">Headline Hijack · Round {roundNumber} of 6</div><h2 className="mt-6 text-4xl font-black md:text-6xl">{round.prompt}</h2><p className="mt-6 text-xl text-slate-300">{phase === 'prompt' ? `Round Owner: ${owner.name}` : '3 of 3 answers received'}</p></div>
         </div>}
         {(phase === 'reveal' || phase === 'voting') && <div className="flex flex-1 flex-col justify-center">
-          <h2 className="text-center text-3xl font-black md:text-5xl">Which answer sounds like {owner.name}?</h2>
+          <h2 className={`text-center text-3xl font-black md:text-5xl ${phase === 'voting' ? 'mr-16 md:mr-20' : ''}`}>Which answer sounds like {owner.name}?</h2>
           <div className="mt-6 grid grid-cols-3 gap-3">{answers.map((answer, index) => <div key={answer} className="rounded-xl border border-white/10 bg-white/5 p-4"><div className="text-xs font-black text-fuchsia-300">ANSWER {index + 1}</div><p className="mt-2 font-bold">{answer}</p></div>)}</div>
-          {phase === 'voting' && <p className="mt-5 text-center text-amber-300">Players are guessing and choosing favourites · 18s</p>}
+          {phase === 'voting' && <p className="mt-5 text-center text-amber-300">Players are guessing and choosing favourites</p>}
         </div>}
         {phase === 'results' && <div className="flex flex-1 flex-col justify-center text-center">
           <div className="text-xs font-black uppercase tracking-[0.3em] text-amber-300">Round {roundNumber} results</div><h2 className="mt-2 text-3xl font-black md:text-4xl">{owner.avatar} {owner.name} was the Round Owner</h2><p className="mt-2 text-lg md:text-xl">“{round.answers[round.ownerIndex]}”</p>
