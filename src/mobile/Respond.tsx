@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { submitAnswer } from '../lib/orchestrator'
+import { parsePrompt } from '../lib/gameState'
+import { MobileCountdown } from '../components/CountdownClock'
 
 interface RespondProps {
   roomId: string
@@ -14,6 +16,7 @@ export default function Respond({ roomId, playerId }: RespondProps) {
   const [prompt, setPrompt] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
 
   // Load current round for this room
   useEffect(() => {
@@ -27,25 +30,32 @@ export default function Respond({ roomId, playerId }: RespondProps) {
         .single()
       if (!error && data) {
         setRoundId(data.id)
-        setDeadline(data.deadline)
-        const p = (data as any)?.prompt
-        if (p && typeof p === 'object' && p.text) setPrompt(p.text)
+        setDeadline(data.deadline || '')
+        setPrompt(parsePrompt(data.prompt))
+        const { data: existingSubmission } = await supabase
+          .from('submissions')
+          .select('text')
+          .eq('round_id', data.id)
+          .eq('player_id', playerId)
+          .maybeSingle()
+        if (existingSubmission) {
+          setText(existingSubmission.text)
+          setSubmitted(true)
+        }
       }
     }
     load()
-  }, [roomId])
+  }, [playerId, roomId])
 
   const msLeft = useMemo(() => {
     if (!deadline) return 0
-    return Math.max(0, new Date(deadline).getTime() - Date.now())
-  }, [deadline])
+    return Math.max(0, new Date(deadline).getTime() - now)
+  }, [deadline, now])
 
   useEffect(() => {
     if (!deadline) return
-    const t = setInterval(() => {
-      // Trigger re-render
-      setDeadline((d) => d)
-    }, 500)
+    setNow(Date.now())
+    const t = setInterval(() => setNow(Date.now()), 500)
     return () => clearInterval(t)
   }, [deadline])
 
@@ -53,11 +63,13 @@ export default function Respond({ roomId, playerId }: RespondProps) {
     if (!roundId) return
     setSubmitting(true)
     try {
+      console.log('Submitting answer:', { roundId, playerId, text: text.trim() })
       await submitAnswer(roundId, playerId, text)
+      console.log('Answer submitted successfully')
       setSubmitted(true)
     } catch (e) {
+      console.error('Submit error:', e)
       alert((e as Error).message || 'Failed to submit')
-    } finally {
       setSubmitting(false)
     }
   }
@@ -67,42 +79,43 @@ export default function Respond({ roomId, playerId }: RespondProps) {
 
   if (!roundId) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="text-center text-gray-700">Waiting for round...</div>
+      <div className="whatever-stage flex min-h-screen items-center justify-center p-4">
+        <div className="eyebrow text-[#8f98a3]">Waiting for the next round…</div>
       </div>
     )
   }
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
+      <div className="whatever-stage flex min-h-screen items-center justify-center p-4 text-[#f3efe4]">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-green-600 mb-4">Answer submitted!</h1>
-          <p className="text-gray-600">Waiting for reveal...</p>
+          <div className="mx-auto mb-5 h-3 w-3 rounded-full bg-[#73d8b0] shadow-[0_0_1.5rem_rgba(115,216,176,.65)]" />
+          <h1 className="mb-4 text-3xl font-black tracking-[-.04em]">Answer submitted</h1>
+          <p className="text-[#8f98a3]">Eyes on the TV. The reveal is next.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white p-6 rounded-lg shadow w-full max-w-md">
-        <h1 className="text-xl font-semibold mb-2">Submit your answer</h1>
-        {prompt && <p className="text-sm text-gray-700 mb-2">Prompt: <span className="font-medium">{prompt}</span></p>}
-        <p className="text-sm text-gray-500 mb-4">Time left: {secondsLeft}s</p>
+    <div className="whatever-stage relative flex min-h-screen items-center justify-center p-4 text-[#f3efe4]">
+      <div className="absolute right-4 top-4"><MobileCountdown seconds={secondsLeft} /></div>
+      <div className="material-panel w-full max-w-md rounded-[2rem] p-6 pt-8">
+        <div className="eyebrow text-[#35d8e6]">Your answer</div>
+        {prompt && <h1 className="mb-5 mt-3 text-3xl font-black leading-tight tracking-[-.04em]">{prompt}</h1>}
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={100}
           rows={4}
-          className="w-full border rounded p-3 mb-2"
-          placeholder="Type up to 100 characters"
+          className="paper-slip mb-2 w-full resize-none rounded-2xl border-0 p-4 font-semibold leading-relaxed outline-none ring-[#35d8e6] focus:ring-2"
+          placeholder="Write the line only you would write…"
         />
-        <div className="text-xs text-gray-500 mb-3">{text.length}/100</div>
+        <div className="mb-3 text-xs text-slate-500">{text.length}/100</div>
         <button
           onClick={handleSubmit}
           disabled={disabled}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 rounded"
+          className="w-full rounded-full bg-[#f24b9d] py-3 font-black text-[#170a12] transition hover:bg-[#ff6aae] disabled:bg-[#252b34] disabled:text-[#69717c]"
         >
           {submitting ? 'Submitting...' : 'Submit'}
         </button>

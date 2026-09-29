@@ -1,13 +1,21 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { joinRoom, broadcast } from '../lib/orchestrator'
+import {
+  joinRoom,
+  broadcast,
+  deriveBoardState,
+  getRevealItems,
+  getRoomPreview,
+  setPlayerConnected,
+} from '../lib/orchestrator'
 import { supabase } from '../lib/supabase'
 import CategoryOptIn from './CategoryOptIn'
 import Respond from './Respond'
 import GuessVote from './GuessVote'
 import Results from './Results'
 import { subscribeToRoom, unsubscribeFromRoom } from '../lib/orchestrator'
-import type { RealtimeChannel } from '@supabase/supabase-js'
+import { parseRoomEvent, parseStringArray } from '../lib/gameState'
+import { PlayerDot, WhateverMark } from '../components/WhateverVisuals'
 
 const COLORS = [
   { name: 'Red', value: '🔴', hex: '#ef4444' },
@@ -32,6 +40,7 @@ export default function Join() {
   const [leftRoomId, setLeftRoomId] = useState<string | null>(null)
   const [takenColors, setTakenColors] = useState<string[]>([])
   const [phase, setPhase] = useState<'idle' | 'respond' | 'ready' | 'guessvote' | 'results'>('idle')
+  const [phaseInitialized, setPhaseInitialized] = useState(false)
   const [revealItems, setRevealItems] = useState<{ id: string; text: string }[]>([])
   const [voteDeadline, setVoteDeadline] = useState<string | undefined>(undefined)
 
@@ -42,12 +51,7 @@ export default function Join() {
         const playerId = localStorage.getItem('playerId')
         if (playerId && success !== 'left') {
           // Fire-and-forget; may not always complete but improves accuracy
-          supabase
-            .from('players')
-            .update({ connected: false })
-            .eq('id', playerId)
-            .then(() => {})
-            .catch(() => {})
+          void setPlayerConnected(playerId, false).catch(() => undefined)
         }
       } catch {
         // ignore
@@ -62,24 +66,81 @@ export default function Join() {
     }
   }, [success])
 
-  const fetchTakenColors = useCallback(async () => {
-    if (!roomId) return
-    
-    try {
-      const { data: players, error } = await supabase
-        .from('players')
-        .select('avatar')
-        .eq('room_id', roomId)
-        .eq('connected', true)
-      
-      if (error) {
-        console.error('Error fetching taken colors:', error)
+  // Check existing player state and resume correct phase
+  useEffect(() => {
+    const checkExistingPlayer = async () => {
+      if (!roomId || phaseInitialized) return
+
+      const playerId = localStorage.getItem('playerId')
+      if (!playerId) {
+        setPhaseInitialized(true)
         return
       }
-      
-      const taken = players?.map(player => player.avatar) || []
+
+      try {
+        // Check if player still exists and is connected
+        const { data: player, error: playerError } = await supabase
+          .from('players')
+          .select('id, name, connected, selected_categories')
+          .eq('id', playerId)
+          .eq('room_id', roomId)
+          .single()
+
+        if (playerError || !player) {
+          // Player doesn't exist, clear storage and start fresh
+          localStorage.removeItem('playerId')
+          setPhaseInitialized(true)
+          return
+        }
+
+        // Player exists, check game state
+        const boardState = await deriveBoardState(roomId)
+
+        if (parseStringArray(player.selected_categories).length === 0) {
+          // Player hasn't selected categories yet
+          setSuccess('joined')
+          setPhaseInitialized(true)
+          return
+        }
+
+        // Player has selected categories
+        setSuccess('categories_selected')
+
+        // Determine phase based on current round state
+        if (boardState.currentRound) {
+          if (boardState.currentRound.phase === 'guessing') {
+            setRevealItems(await getRevealItems(boardState.currentRound.id))
+            setVoteDeadline(boardState.currentRound.vote_deadline || undefined)
+            setPhase('guessvote')
+          } else if (boardState.currentRound.phase === 'results') {
+            setPhase('results')
+          } else if (boardState.currentRound.deadline) {
+            // Round is active with countdown
+            setPhase('respond')
+          } else {
+            // Round started but no countdown yet
+            setPhase('idle')
+          }
+        }
+
+        setPhaseInitialized(true)
+      } catch (error) {
+        console.error('Error checking existing player:', error)
+        setPhaseInitialized(true)
+      }
+    }
+
+    checkExistingPlayer()
+  }, [roomId, phaseInitialized])
+
+  const fetchTakenColors = useCallback(async () => {
+    if (!roomId) return
+
+    try {
+      const preview = await getRoomPreview(roomId)
+      const taken = preview.avatars
       setTakenColors(taken)
-      
+
       // If selected color is taken, select first available
       if (taken.includes(selectedColor.value)) {
         const availableColor = COLORS.find(color => !taken.includes(color.value))
@@ -99,12 +160,12 @@ export default function Join() {
     }
   }, [roomId, fetchTakenColors])
 
-  // Subscribe to round:start to flip into Respond phase
+  // Subscribe to round:countdown_start to flip into Respond phase
   useEffect(() => {
     if (!roomId) return
     const ch = subscribeToRoom(roomId, (payload) => {
-      const p: any = payload
-      if (p?.event === 'round:start') {
+      const p = parseRoomEvent(payload)
+      if (p?.event === 'round:countdown_start') {
         setPhase('respond')
       }
       if (p?.event === 'round:reveal') {
@@ -140,7 +201,7 @@ export default function Join() {
 
     setIsJoining(true)
     setError('')
-    
+
     try {
       const result = await joinRoom(roomId, properName, selectedColor.value)
       setName(properName)
@@ -161,16 +222,14 @@ export default function Join() {
       const rid = localStorage.getItem('roomId') || roomId || ''
       setLeftRoomId(rid || null)
       if (playerId) {
-        const { error } = await supabase
-          .from('players')
-          .update({ connected: false })
-          .eq('id', playerId)
-        if (error) {
-          console.error('Error leaving room:', error)
-        }
+        await setPlayerConnected(playerId, false)
         // Broadcast so host UI updates even if PG changes are not enabled
         if (rid) {
-          try { await broadcast(rid, 'room:update', { type: 'player:left', playerId }) } catch {}
+          try {
+            await broadcast(rid, 'room:update', { type: 'player:left', playerId })
+          } catch (error) {
+            console.warn('Failed to broadcast player departure', error)
+          }
         }
       }
     } catch (e) {
@@ -207,9 +266,9 @@ export default function Join() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <CategoryOptIn 
-            playerId={playerId} 
-            roomId={roomId!} 
+          <CategoryOptIn
+            playerId={playerId}
+            roomId={roomId!}
             onComplete={() => setSuccess('categories_selected')}
           />
           <div className="mt-4 text-center">
@@ -226,7 +285,7 @@ export default function Join() {
   }
 
   if (success === 'categories_selected') {
-    // If a round is already active, render Respond; otherwise show waiting screen until round:start
+    // If a round is already active, render Respond; otherwise show waiting screen until round:countdown_start
     if (phase === 'respond') {
       const playerId = localStorage.getItem('playerId')!
       return <Respond roomId={roomId!} playerId={playerId} />
@@ -240,11 +299,12 @@ export default function Join() {
       return <Results roomId={roomId!} playerId={playerId} />
     }
     return (
-      <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
+      <div className="whatever-stage flex min-h-screen items-center justify-center p-4 text-[#f3efe4]">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-green-600 mb-4">🎉 Ready to Play!</h1>
-          <p className="text-gray-600 mb-4">You've joined the room and selected your categories.</p>
-          <p className="text-sm text-gray-500 mb-6">Wait for the host to start the game...</p>
+          <div className="mx-auto mb-5 h-3 w-3 rounded-full bg-[#73d8b0] shadow-[0_0_1.5rem_rgba(115,216,176,.65)]" />
+          <h1 className="mb-4 text-3xl font-black tracking-[-.04em]">You’re in</h1>
+          <p className="mb-4 text-[#b3b8c0]">Your place in room {roomId} is saved.</p>
+          <p className="mb-6 text-sm text-[#737b86]">The host will start when everyone is ready.</p>
           <button
             onClick={leaveCurrent}
             className="text-sm text-gray-700 underline hover:text-gray-900"
@@ -257,60 +317,60 @@ export default function Join() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h1 className="text-2xl font-bold text-center mb-6">Join Room: {roomId}</h1>
+    <div className="whatever-stage flex min-h-screen items-center justify-center p-4 text-[#f3efe4]">
+      <div className="material-panel w-full max-w-md rounded-[2rem] p-6">
+        <div className="mb-8 text-center"><WhateverMark compact /><div className="eyebrow mt-5 text-[#e8bd45]">Join room {roomId}</div></div>
         {success === 'left' && leftRoomId && (
-          <div className="mb-4 p-3 rounded bg-yellow-100 text-yellow-800 text-sm text-center">
+          <div className="mb-4 rounded-xl border border-[#e8bd45]/20 bg-[#e8bd45]/10 p-3 text-center text-sm text-[#e8cf80]">
             You left Room {leftRoomId}. You can rejoin below.
           </div>
         )}
-        
+
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="mb-4 rounded-xl border border-[#f24b9d]/40 bg-[#f24b9d]/10 px-4 py-3 text-[#ff9bc9]">
             {error}
           </div>
         )}
-        
+
         <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            Your Name
+          <label className="eyebrow mb-2 block text-[#8f98a3]">
+            Your name
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+            className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-lg font-semibold outline-none focus:border-[#35d8e6]"
             placeholder="Enter your name"
             maxLength={20}
           />
         </div>
-        
+
         <div className="mb-6">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            Choose Your Color
+          <label className="eyebrow mb-3 block text-[#8f98a3]">
+            Choose your colour
           </label>
           <div className="grid grid-cols-4 gap-2">
             {COLORS.map((color) => {
               const isTaken = takenColors.includes(color.value)
               const isSelected = selectedColor.name === color.name
-              
+
               return (
                 <button
                   key={color.name}
                   onClick={() => !isTaken && setSelectedColor(color)}
                   disabled={isTaken}
-                  className={`p-3 text-2xl rounded-lg border-4 transition-all ${
-                    isTaken 
-                      ? 'border-gray-300 bg-gray-200 opacity-50 cursor-not-allowed'
+                  className={`grid min-h-20 place-items-center rounded-2xl border transition-all ${
+                    isTaken
+                      ? 'cursor-not-allowed border-white/5 bg-white/[.02] opacity-35'
                       : isSelected
-                        ? 'border-gray-800 bg-gray-100 scale-110'
-                        : 'border-gray-200 hover:border-gray-400'
+                        ? 'scale-105 bg-white/10'
+                        : 'border-white/10 bg-white/[.03] hover:bg-white/[.06]'
                   }`}
                   style={{ borderColor: isSelected && !isTaken ? color.hex : undefined }}
                 >
-                  {color.value}
-                  <div className={`text-xs mt-1 ${isTaken ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <PlayerDot color={color.hex} />
+                  <div className={`mt-1 text-[.62rem] font-bold ${isTaken ? 'text-[#555d67]' : 'text-[#9ca3ad]'}`}>
                     {color.name}{isTaken ? ' (taken)' : ''}
                   </div>
                 </button>
@@ -318,11 +378,11 @@ export default function Join() {
             })}
           </div>
         </div>
-        
+
         <button
           onClick={handleJoin}
           disabled={isJoining || !name.trim()}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
+          className="w-full rounded-full bg-[#f24b9d] px-4 py-3 font-black text-[#170a12] transition hover:bg-[#ff6aae] disabled:cursor-not-allowed disabled:bg-[#252b34] disabled:text-[#69717c]"
         >
           {isJoining ? 'Joining...' : 'Join Game'}
         </button>

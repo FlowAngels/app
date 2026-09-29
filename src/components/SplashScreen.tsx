@@ -1,41 +1,59 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { createRoom } from '../lib/orchestrator'
+import { ensureAnonymousSession } from '../lib/auth'
+import { useAuthenticatedCommands } from '../lib/backendMode'
+import { FeltThing, WhateverMark } from './WhateverVisuals'
 
 export default function SplashScreen() {
   const navigate = useNavigate()
   const [canResume, setCanResume] = useState(false)
   const [latestRoomId, setLatestRoomId] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     const init = async () => {
-      // Stable host device id
+      if (useAuthenticatedCommands) await ensureAnonymousSession()
       let hostDeviceId = localStorage.getItem('hostDeviceId')
       if (!hostDeviceId) {
-        hostDeviceId = 'host-' + Math.random().toString(36).slice(2, 11)
+        hostDeviceId = `host-${Math.random().toString(36).slice(2, 11)}`
         localStorage.setItem('hostDeviceId', hostDeviceId)
       }
 
-      // If a current room is cached, allow resume immediately
       const cached = localStorage.getItem('currentRoomId')
       if (cached) {
-        setCanResume(true)
-        setLatestRoomId(cached)
-        return
+        const { data: cachedRoom, error } = await supabase
+          .from('rooms')
+          .select('id,status,created_at,round_index,total_rounds')
+          .eq('id', cached)
+          .eq('host_device_id', hostDeviceId)
+          .neq('status', 'ended')
+          .single()
+
+        if (!error && cachedRoom) {
+          const roomAge = Date.now() - new Date(cachedRoom.created_at).getTime()
+          if (roomAge < 30 * 60 * 1000 && cachedRoom.round_index < cachedRoom.total_rounds) {
+            setCanResume(true)
+            setLatestRoomId(cached)
+            return
+          }
+        }
+        localStorage.removeItem('currentRoomId')
       }
 
-      // Otherwise, look up recent rooms for this device (not ended, <30m old)
       const { data, error } = await supabase
         .from('rooms')
-        .select('id,status,created_at')
+        .select('id,status,created_at,round_index,total_rounds')
         .eq('host_device_id', hostDeviceId)
         .neq('status', 'ended')
         .order('created_at', { ascending: false })
         .limit(5)
       if (error) return
-      const now = Date.now()
-      const fresh = (data || []).filter(r => (now - new Date(r.created_at).getTime()) < 30 * 60 * 1000)
+      const fresh = (data || []).filter((room) =>
+        Date.now() - new Date(room.created_at).getTime() < 30 * 60 * 1000 &&
+        room.round_index < room.total_rounds,
+      )
       if (fresh.length > 0) {
         setCanResume(true)
         setLatestRoomId(fresh[0].id)
@@ -44,296 +62,80 @@ export default function SplashScreen() {
     init()
   }, [])
 
+  const createGame = async () => {
+    if (creating) return
+    setCreating(true)
+    try {
+      let hostDeviceId = localStorage.getItem('hostDeviceId')
+      if (!hostDeviceId) {
+        hostDeviceId = `host-${Math.random().toString(36).slice(2, 11)}`
+        localStorage.setItem('hostDeviceId', hostDeviceId)
+      }
+      const { id } = await createRoom(hostDeviceId)
+      localStorage.removeItem('hostPlayerId')
+      localStorage.setItem('currentRoomId', id)
+      navigate(`/lobby?room=${id}&hostJoin=1`)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const resumeGame = () => {
+    if (latestRoomId) {
+      localStorage.setItem('currentRoomId', latestRoomId)
+      navigate(`/lobby?room=${latestRoomId}`)
+    } else {
+      navigate('/lobby')
+    }
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{
-      background: 'radial-gradient(ellipse at center, #0f172a 0%, #1e293b 30%, #0f172a 70%, #000 100%)',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
-    }}>
-      
-      {/* 3D Textured Characters */}
-      <div className="absolute" style={{
-        top: '8%',
-        left: '12%',
-        fontSize: '8rem',
-        transform: 'rotate(-15deg)',
-        filter: 'drop-shadow(8px 8px 16px rgba(0,0,0,0.7))'
-      }}>
-        <div style={{
-          background: 'conic-gradient(from 45deg, #64748b, #94a3b8, #64748b, #475569)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          textShadow: '4px 4px 8px rgba(0,0,0,0.5)'
-        }}>
-          🎭
-        </div>
-      </div>
+    <main className="whatever-stage min-h-screen px-5 py-8 sm:px-8">
+      <FeltThing shape="bolt" color="#7d8582" className="left-[3%] top-[5%] hidden w-[clamp(6rem,13vw,12rem)] lg:block" style={{ '--thing-rotation': '-14deg' } as CSSProperties} />
+      <FeltThing shape="star" color="#d8a91f" className="right-[4%] top-[4%] hidden w-[clamp(7rem,14vw,13rem)] md:block" style={{ '--thing-rotation': '8deg', animationDelay: '-1.4s' } as CSSProperties} />
+      <FeltThing shape="blob" color="#1e9bbb" className="-bottom-10 -left-12 w-[clamp(7rem,15vw,13rem)] sm:bottom-[8%] sm:-left-8" style={{ '--thing-rotation': '-12deg', animationDelay: '-3s' } as CSSProperties} />
+      <FeltThing shape="ghost" color="#8b5aa8" className="-right-7 bottom-[6%] hidden w-[clamp(7rem,15vw,13rem)] sm:block" style={{ '--thing-rotation': '9deg', animationDelay: '-4.6s' } as CSSProperties} />
 
-      <div className="absolute" style={{
-        top: '15%',
-        right: '8%',
-        fontSize: '10rem',
-        transform: 'rotate(20deg)',
-        filter: 'drop-shadow(12px 12px 24px rgba(0,0,0,0.8))'
-      }}>
-        <div style={{
-          background: 'conic-gradient(from 0deg, #fbbf24, #f59e0b, #d97706, #fbbf24)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          textShadow: '6px 6px 12px rgba(0,0,0,0.6)'
-        }}>
-          ⭐
-        </div>
-      </div>
-
-      <div className="absolute" style={{
-        bottom: '20%',
-        left: '8%',
-        fontSize: '9rem',
-        transform: 'rotate(-25deg)',
-        filter: 'drop-shadow(10px 10px 20px rgba(0,0,0,0.7))'
-      }}>
-        <div style={{
-          background: 'conic-gradient(from 90deg, #3b82f6, #1d4ed8, #1e40af, #3b82f6)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          textShadow: '5px 5px 10px rgba(0,0,0,0.5)'
-        }}>
-          😵
-        </div>
-      </div>
-
-      <div className="absolute" style={{
-        bottom: '12%',
-        right: '15%',
-        fontSize: '11rem',
-        transform: 'rotate(30deg)',
-        filter: 'drop-shadow(14px 14px 28px rgba(0,0,0,0.8))'
-      }}>
-        <div style={{
-          background: 'conic-gradient(from 180deg, #a855f7, #7c3aed, #6d28d9, #a855f7)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          textShadow: '7px 7px 14px rgba(0,0,0,0.6)'
-        }}>
-          🎪
-        </div>
-      </div>
-
-      <div className="absolute" style={{
-        top: '45%',
-        left: '5%',
-        fontSize: '7rem',
-        transform: 'rotate(-35deg)',
-        filter: 'drop-shadow(6px 6px 12px rgba(0,0,0,0.6))'
-      }}>
-        <div style={{
-          background: 'conic-gradient(from 270deg, #fbbf24, #f59e0b, #eab308, #fbbf24)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          textShadow: '3px 3px 6px rgba(0,0,0,0.4)'
-        }}>
-          ⭐
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="text-center relative z-10 px-8" style={{maxWidth: '80rem'}}>
-        
-        {/* WHATEVER! Title */}
-        <h1 style={{
-          fontSize: '8.5rem',
-          fontWeight: '900',
-          letterSpacing: '0.05em',
-          marginBottom: '2rem',
-          lineHeight: '1',
-          position: 'relative'
-        }}>
-          {/* WHAT - Neon tube style */}
-          <span style={{
-            color: 'transparent',
-            WebkitTextStroke: '3px #00f5ff',
-            textShadow: `
-              0 0 10px #00f5ff,
-              0 0 20px #00f5ff,
-              0 0 30px #00f5ff,
-              0 0 40px #00f5ff,
-              0 0 70px #00f5ff,
-              0 0 80px #00f5ff,
-              0 0 100px #00f5ff,
-              inset 0 0 10px #00f5ff
-            `,
-            filter: 'drop-shadow(0 0 20px #00f5ff)'
-          }}>WHAT</span>
-          
-          {/* EVER! - Neon tube style */}
-          <span style={{
-            color: 'transparent',
-            WebkitTextStroke: '3px #ff1493',
-            textShadow: `
-              0 0 10px #ff1493,
-              0 0 20px #ff1493,
-              0 0 30px #ff1493,
-              0 0 40px #ff1493,
-              0 0 70px #ff1493,
-              0 0 80px #ff1493,
-              0 0 100px #ff1493,
-              inset 0 0 10px #ff1493
-            `,
-            filter: 'drop-shadow(0 0 20px #ff1493)'
-          }}>EVER!</span>
-        </h1>
-        
-        {/* Add CSS for neon tube animation */}
-        <style>{`
-          @keyframes neonFlicker {
-            0%, 18%, 22%, 25%, 53%, 57%, 100% {
-              text-shadow: 
-                0 0 10px currentColor,
-                0 0 20px currentColor,
-                0 0 30px currentColor,
-                0 0 40px currentColor,
-                0 0 70px currentColor,
-                0 0 80px currentColor,
-                0 0 100px currentColor;
-            }
-            20%, 24%, 55% {
-              text-shadow: 
-                0 0 5px currentColor,
-                0 0 10px currentColor,
-                0 0 15px currentColor,
-                0 0 20px currentColor,
-                0 0 35px currentColor,
-                0 0 40px currentColor,
-                0 0 50px currentColor;
-            }
-          }
-        `}</style>
-
-        {/* Tagline */}
-        <p style={{
-          fontSize: '2rem',
-          color: '#fbbf24',
-          marginBottom: '4rem',
-          fontWeight: '500',
-          textShadow: '0 2px 10px rgba(251, 191, 36, 0.4)'
-        }}>
+      <section className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] max-w-5xl flex-col items-center justify-center text-center">
+        <div className="eyebrow mb-6 text-[#8b929c]">A game of suspiciously familiar answers</div>
+        <h1><WhateverMark /></h1>
+        <p className="mt-7 text-[clamp(1.05rem,2.2vw,1.55rem)] font-medium tracking-[-.02em] text-[#e6c86c]">
           Say it in 100 characters. Laugh in 1000.
         </p>
 
-        {/* Game Info Badges */}
-        <div className="flex justify-center items-center" style={{gap: '2rem', marginBottom: '4rem'}}>
-          <div>
-            <span style={{
-              color: '#fbbf24',
-              fontWeight: '600',
-              fontSize: '1.25rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              textShadow: '0 0 10px #fbbf24, 0 0 20px #fbbf24'
-            }}>
-              🎉 Party
-            </span>
-          </div>
-
-          <div>
-            <span style={{
-              color: '#10b981',
-              fontWeight: '600',
-              fontSize: '1.25rem',
-              textShadow: '0 0 10px #10b981, 0 0 20px #10b981'
-            }}>
-              1–8 players
-            </span>
-          </div>
-
-          <div>
-            <span style={{
-              color: '#3b82f6',
-              fontWeight: '600',
-              fontSize: '1.25rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              textShadow: '0 0 10px #3b82f6, 0 0 20px #3b82f6'
-            }}>
-              ⏰ 15 min
-            </span>
-          </div>
+        <div className="mt-9 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm font-semibold text-[#b8bdc6] sm:text-base">
+          <span><b className="mr-2 text-[#e8bd45]">●</b>Party game</span>
+          <span><b className="mr-2 text-[#73d8b0]">●</b>3–8 players</span>
+          <span><b className="mr-2 text-[#35d8e6]">●</b>About 20 minutes</span>
         </div>
 
-        {/* Description */}
-        <div style={{
-          color: '#cbd5e1',
-          fontSize: '1.5rem',
-          lineHeight: '1.6',
-          maxWidth: '42rem',
-          margin: '0 auto',
-          textShadow: '0 2px 8px rgba(0,0,0,0.6)'
-        }}>
-          A couch-friendly, phone-controlled party game.<br />
-          Submit snappy answers, spot the round owner,<br />
-          vote your favorites. Two champions, endless<br />
-          laughs.
-        </div>
+        <p className="mt-9 max-w-2xl text-[clamp(.98rem,1.8vw,1.2rem)] leading-relaxed text-[#aeb4bd]">
+          Write the answer only you would write. Spot the friend hiding in the pile.
+          Then reward the line the room will still be quoting tomorrow.
+        </p>
 
-        {/* Primary Actions */}
-        <div className="flex items-center justify-center" style={{marginTop: '2.5rem', gap: '3rem'}}>
+        <div className="mt-10 flex flex-wrap justify-center gap-3">
           <button
-            onClick={async () => {
-              // Ensure device id
-              let hostDeviceId = localStorage.getItem('hostDeviceId')
-              if (!hostDeviceId) {
-                hostDeviceId = 'host-' + Math.random().toString(36).slice(2, 11)
-                localStorage.setItem('hostDeviceId', hostDeviceId)
-              }
-              const { id } = await createRoom(hostDeviceId)
-              // Clear any stale host player mapping from a previous room
-              localStorage.removeItem('hostPlayerId')
-              localStorage.setItem('currentRoomId', id)
-              navigate(`/lobby?room=${id}&hostJoin=1`)
-            }}
-            style={{
-              backgroundColor: 'rgba(255, 20, 147, 0.3)',
-              color: 'white',
-              padding: '12px 20px',
-              borderRadius: '8px',
-              fontSize: '1.25rem',
-              fontWeight: '600',
-              border: '2px solid #ff1493'
-            }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 20, 147, 0.5)'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255, 20, 147, 0.3)'}
+            onClick={createGame}
+            disabled={creating}
+            className="group rounded-full bg-[#f24b9d] px-8 py-4 text-sm font-black uppercase tracking-[.16em] text-[#140710] shadow-[0_0_0_1px_rgba(255,255,255,.14),0_0_2.2rem_rgba(242,75,157,.28)] transition hover:-translate-y-0.5 hover:bg-[#ff6aae] disabled:cursor-wait disabled:opacity-60"
           >
-            NEW GAME!
+            {creating ? 'Opening the room…' : 'Start a game'} <span className="ml-2 transition-transform group-hover:translate-x-1">→</span>
           </button>
           {canResume && (
             <button
-              onClick={() => {
-                if (latestRoomId) {
-                  localStorage.setItem('currentRoomId', latestRoomId)
-                  navigate(`/lobby?room=${latestRoomId}`)
-                } else {
-                  navigate('/lobby')
-                }
-              }}
-              style={{
-                backgroundColor: 'rgba(0, 245, 255, 0.3)',
-                color: 'white',
-                padding: '12px 20px',
-                borderRadius: '8px',
-                fontSize: '1.25rem',
-                fontWeight: '600',
-                border: '2px solid #00f5ff'
-              }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 245, 255, 0.5)'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 245, 255, 0.3)'}
+              onClick={resumeGame}
+              className="rounded-full border border-[#35d8e6]/45 bg-[#35d8e6]/8 px-8 py-4 text-sm font-black uppercase tracking-[.16em] text-[#87edf4] transition hover:-translate-y-0.5 hover:bg-[#35d8e6]/14"
             >
-              Resume?
+              Resume room {latestRoomId}
             </button>
           )}
         </div>
-      </div>
-    </div>
-  );
+
+        <div className="mt-12 hidden items-center gap-3 text-xs font-semibold uppercase tracking-[.18em] text-[#626a75] sm:flex">
+          <span className="h-px w-10 bg-white/10" /> TV in the middle · phones in hand <span className="h-px w-10 bg-white/10" />
+        </div>
+      </section>
+    </main>
+  )
 }

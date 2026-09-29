@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createRoom, joinRoom, subscribeToRoom, unsubscribeFromRoom, deriveBoardState, startRound, revealRound, startVotePhase, finalizeRound } from '../lib/orchestrator'
+import { createRoom, joinRoom, subscribeToRoom, unsubscribeFromRoom, deriveBoardState, getRevealItems, startRound, beginRoundCountdown, revealRound, startVotePhase, finalizeRound } from '../lib/orchestrator'
 import { getPrompt } from '../lib/prompts'
 import { generateQRCode } from '../lib/qr'
 import CategoryOptIn from '../mobile/CategoryOptIn'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { parseLeaderboards, parsePrompt, parseRoomEvent, parseRoundResults, parseStringArray } from '../lib/gameState'
+import type { Leaderboards, RevealItem, RoundResults } from '../lib/gameState'
+import CountdownClock from './CountdownClock'
+import { WhateverMark } from './WhateverVisuals'
 
 const COLORS = [
   { name: 'Red', value: '🔴', hex: '#ef4444' },
@@ -17,17 +21,6 @@ const COLORS = [
   { name: 'Pink', value: '🩷', hex: '#ec4899' },
   { name: 'Teal', value: '🩵', hex: '#14b8a6' }
 ]
-
-function RoundCountdown({ deadline }: { deadline: string }) {
-  const [now, setNow] = useState(Date.now())
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 500)
-    return () => clearInterval(t)
-  }, [])
-  const msLeft = Math.max(0, new Date(deadline).getTime() - now)
-  const s = Math.ceil(msLeft / 1000)
-  return <span>Time left: <span className="font-semibold">{s}s</span></span>
-}
 
 export default function Lobby() {
   const [searchParams] = useSearchParams()
@@ -42,6 +35,22 @@ export default function Lobby() {
   const [roundDeadline, setRoundDeadline] = useState<string>('')
   const [currentCategory, setCurrentCategory] = useState<string>('')
   const [currentPrompt, setCurrentPrompt] = useState<string>('')
+  const [currentOwnerId, setCurrentOwnerId] = useState('')
+  const [roundPhase, setRoundPhase] = useState<'prompt' | 'responding' | 'guessing' | 'results' | ''>('')
+  const [voteDeadline, setVoteDeadline] = useState('')
+  const [revealItems, setRevealItems] = useState<RevealItem[]>([])
+  const [roundResults, setRoundResults] = useState<RoundResults>({
+    ownerAnswerId: null,
+    correctGuessers: [],
+    voteCounts: {},
+    ownerSweetSpot: false,
+    answerOwners: {},
+    roundChameleon: {},
+    roundCrowd: {},
+  })
+  const [leaderboards, setLeaderboards] = useState<Leaderboards>({ chameleon: {}, crowd: {} })
+  const [roundIndex, setRoundIndex] = useState(0)
+  const [totalRounds, setTotalRounds] = useState(6)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string>('')
   const [channel, setChannel] = useState<RealtimeChannel | null>(null)
@@ -51,9 +60,10 @@ export default function Lobby() {
   const [hostName, setHostName] = useState('')
   const [hostColor, setHostColor] = useState({ name: 'Red', value: '🔴', hex: '#ef4444' })
   const [isJoiningAsHost, setIsJoiningAsHost] = useState(false)
-  const [roomStatus, setRoomStatus] = useState('lobby')
+  const [roundStarted, setRoundStarted] = useState(false)
   const suppressResumeRef = useRef(false)
-  
+  const deadlineTimerRef = useRef<number | null>(null)
+
   // Ensure a stable host device id for this browser
   useEffect(() => {
     let id = localStorage.getItem('hostDeviceId')
@@ -92,18 +102,83 @@ export default function Lobby() {
       const qrDataUrl = await generateQRCode(joinUrl)
       setQrCode(qrDataUrl)
 
-      const roomChannel = subscribeToRoom(id, async (payload: any) => {
+      const roomChannel = subscribeToRoom(id, async (payload) => {
+        const event = parseRoomEvent(payload)
+        console.log('Lobby received event:', payload)
         const boardState = await deriveBoardState(id)
         setPlayers(boardState.players)
         if (boardState.room?.created_at) {
-          
+
           setExpiresInSec(computeExpiry(boardState.room.created_at))
         }
         setSubmissionCount(boardState.submissionCount || 0)
         setSubmittedIds(boardState.submittedPlayerIds || [])
         setRoundDeadline(boardState.currentRound?.deadline || '')
-        setCurrentCategory((boardState.currentRound as any)?.category || '')
-        setCurrentPrompt(((boardState.currentRound as any)?.prompt?.text) || '')
+        setCurrentCategory(boardState.currentRound?.category || '')
+        setCurrentPrompt(boardState.currentRound ? parsePrompt(boardState.currentRound.prompt) : '')
+        setCurrentOwnerId(boardState.currentRound?.owner_id || '')
+        setRoundPhase(boardState.currentRound?.phase || '')
+        setVoteDeadline(boardState.currentRound?.vote_deadline || '')
+        setRoundResults(parseRoundResults(boardState.currentRound?.results))
+        setLeaderboards(parseLeaderboards(boardState.room?.leaderboards))
+        setRoundIndex(boardState.room?.round_index || 0)
+        setTotalRounds(boardState.room?.total_rounds || 6)
+        if (boardState.currentRound?.id && (boardState.currentRound.phase === 'guessing' || boardState.currentRound.phase === 'results')) {
+          setRevealItems(await getRevealItems(boardState.currentRound.id))
+        } else {
+          setRevealItems([])
+        }
+        setCategoriesLocked(boardState.categoriesLocked || 0)
+
+        // Set up deadline auto-progression timer
+        if (boardState.currentRound?.deadline) {
+          const deadline = new Date(boardState.currentRound.deadline).getTime()
+          const now = Date.now()
+          const timeLeft = deadline - now
+
+          // Clear any existing timer
+          if (deadlineTimerRef.current) {
+            clearTimeout(deadlineTimerRef.current)
+          }
+
+          // Set timer to auto-reveal when deadline expires (if time is left)
+          if (timeLeft > 0) {
+            deadlineTimerRef.current = window.setTimeout(async () => {
+              try {
+                console.log('Deadline expired, auto-revealing round...')
+                await revealRound(id)
+                await startVotePhase(id)
+              } catch (e) {
+                console.error('Auto-reveal failed:', e)
+              }
+              deadlineTimerRef.current = null
+            }, timeLeft)
+          } else if (timeLeft <= 0) {
+            // Deadline already expired, trigger immediately
+            setTimeout(async () => {
+              try {
+                console.log('Deadline already expired, auto-revealing round...')
+                await revealRound(id)
+                await startVotePhase(id)
+              } catch (e) {
+                console.error('Auto-reveal failed:', e)
+              }
+            }, 100)
+          }
+        } else {
+          // No deadline, clear timer
+          if (deadlineTimerRef.current) {
+            clearTimeout(deadlineTimerRef.current)
+            deadlineTimerRef.current = null
+          }
+        }
+
+        // Check if round started but no deadline yet
+        if (boardState.currentRound && !boardState.currentRound.deadline) {
+          setRoundStarted(true)
+        } else if (!boardState.currentRound) {
+          setRoundStarted(false)
+        }
 
         // Pre-start prompt preview when no active round
         if (!boardState.currentRound) {
@@ -119,33 +194,52 @@ export default function Lobby() {
         }
 
         // Auto-reveal when everyone submitted and not yet revealed
-        const round = (boardState as any).currentRound
+        const round = boardState.currentRound
         if (round && boardState.submissionCount === boardState.playerCount) {
           const rid = round.id as string
-          const revealed = Array.isArray(round.reveal_order) && round.reveal_order.length > 0
+          const revealed = parseStringArray(round.reveal_order).length > 0
           if (!revealed && autoFlagsRef.current.revealedFor !== rid) {
             autoFlagsRef.current.revealedFor = rid
             try {
               await revealRound(id)
               // Auto-start voting immediately after reveal
               await startVotePhase(id)
-            } catch {}
+            } catch (error) {
+              console.error('Automatic reveal failed', error)
+            }
           }
         }
 
         // Auto-finalize at vote deadline
-        if (payload?.event === 'round:vote_start') {
-          const dl = payload?.payload?.voteDeadline
+        if (event.event === 'round:vote_start') {
+          const dl = event.payload?.voteDeadline
           if (dl) {
             const ms = Math.max(0, new Date(dl).getTime() - Date.now())
             if (autoFlagsRef.current.voteTimer) {
-              clearTimeout(autoFlagsRef.current.voteTimer as any)
+              clearTimeout(autoFlagsRef.current.voteTimer)
             }
             autoFlagsRef.current.voteTimer = window.setTimeout(async () => {
-              try { await finalizeRound(id) } catch {}
+              try {
+                await finalizeRound(id)
+              } catch (error) {
+                console.error('Automatic finalization failed', error)
+              }
               autoFlagsRef.current.voteTimer = null
             }, ms)
           }
+        }
+
+        if (boardState.currentRound?.phase === 'guessing' && boardState.currentRound.vote_deadline) {
+          const ms = Math.max(0, new Date(boardState.currentRound.vote_deadline).getTime() - Date.now())
+          if (autoFlagsRef.current.voteTimer) clearTimeout(autoFlagsRef.current.voteTimer)
+          autoFlagsRef.current.voteTimer = window.setTimeout(async () => {
+            try {
+              await finalizeRound(id)
+            } catch (error) {
+              console.error('Automatic finalization failed', error)
+            }
+            autoFlagsRef.current.voteTimer = null
+          }, ms)
         }
       })
       setChannel(roomChannel)
@@ -153,34 +247,111 @@ export default function Lobby() {
       const initialState = await deriveBoardState(id)
       setPlayers(initialState.players)
       if (initialState.room?.created_at) {
-        
+
         setExpiresInSec(computeExpiry(initialState.room.created_at))
       }
       setSubmissionCount(initialState.submissionCount || 0)
       setSubmittedIds(initialState.submittedPlayerIds || [])
       setRoundDeadline(initialState.currentRound?.deadline || '')
-      setCurrentCategory((initialState.currentRound as any)?.category || '')
-      setCurrentPrompt(((initialState.currentRound as any)?.prompt?.text) || '')
+      setCurrentCategory(initialState.currentRound?.category || '')
+      setCurrentPrompt(initialState.currentRound ? parsePrompt(initialState.currentRound.prompt) : '')
+      setCurrentOwnerId(initialState.currentRound?.owner_id || '')
+      setRoundPhase(initialState.currentRound?.phase || '')
+      setVoteDeadline(initialState.currentRound?.vote_deadline || '')
+      setRoundResults(parseRoundResults(initialState.currentRound?.results))
+      setLeaderboards(parseLeaderboards(initialState.room?.leaderboards))
+      setRoundIndex(initialState.room?.round_index || 0)
+      setTotalRounds(initialState.room?.total_rounds || 6)
+      if (initialState.currentRound?.id && (initialState.currentRound.phase === 'guessing' || initialState.currentRound.phase === 'results')) {
+        setRevealItems(await getRevealItems(initialState.currentRound.id))
+      } else {
+        setRevealItems([])
+      }
+      setCategoriesLocked(initialState.categoriesLocked || 0)
+
+      if (!initialState.currentRound && initialState.categoryPool.length > 0) {
+        const category = initialState.categoryPool[0]
+        setPreviewCategory(category)
+        setPreviewPrompt(getPrompt(category))
+      }
+
+      // Set up deadline auto-progression timer
+      if (initialState.currentRound?.deadline) {
+        const deadline = new Date(initialState.currentRound.deadline).getTime()
+        const now = Date.now()
+        const timeLeft = deadline - now
+
+        // Clear any existing timer
+        if (deadlineTimerRef.current) {
+          clearTimeout(deadlineTimerRef.current)
+        }
+
+        // Set timer to auto-reveal when deadline expires (if time is left)
+        if (timeLeft > 0) {
+          deadlineTimerRef.current = window.setTimeout(async () => {
+            try {
+              console.log('Deadline expired, auto-revealing round...')
+              await revealRound(id)
+              await startVotePhase(id)
+            } catch (e) {
+              console.error('Auto-reveal failed:', e)
+            }
+            deadlineTimerRef.current = null
+          }, timeLeft)
+        } else if (timeLeft <= 0) {
+          // Deadline already expired, trigger immediately
+          setTimeout(async () => {
+            try {
+              console.log('Deadline already expired, auto-revealing round...')
+              await revealRound(id)
+              await startVotePhase(id)
+            } catch (e) {
+              console.error('Auto-reveal failed:', e)
+            }
+          }, 100)
+        }
+      }
+
+      // Check if round started but no deadline yet
+      if (initialState.currentRound && !initialState.currentRound.deadline) {
+        setRoundStarted(true)
+      } else {
+        setRoundStarted(false)
+      }
+
+
+      if (initialState.currentRound?.phase === 'guessing' && initialState.currentRound.vote_deadline) {
+        const ms = Math.max(0, new Date(initialState.currentRound.vote_deadline).getTime() - Date.now())
+        if (autoFlagsRef.current.voteTimer) clearTimeout(autoFlagsRef.current.voteTimer)
+        autoFlagsRef.current.voteTimer = window.setTimeout(async () => {
+          try {
+            await finalizeRound(id)
+          } catch (error) {
+            console.error('Automatic finalization failed', error)
+          }
+          autoFlagsRef.current.voteTimer = null
+        }, ms)
+      }
     } catch (err) {
       console.error('Error initializing lobby for room:', err)
       setError('Failed to resume room')
     }
-  }, [navigate])
+  }, [computeExpiry, navigate])
 
   const handleCreateRoom = async () => {
     setIsLoading(true)
     setError('')
-    
+
     try {
       const devId = hostDeviceId || 'host-' + Math.random().toString(36).substr(2, 9)
       const { id } = await createRoom(devId)
       setRoomId(id)
       localStorage.setItem('currentRoomId', id)
       navigate(`/lobby?room=${id}`, { replace: true })
-      
+
       // Show modal for host to join as player
       setShowHostJoinModal(true)
-      
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create room')
     } finally {
@@ -206,13 +377,13 @@ export default function Lobby() {
       const result = await joinRoom(roomId, properName, hostColor.value)
       setHostPlayerId(result.playerId)
       localStorage.setItem('hostPlayerId', result.playerId)
-      
+
       // Close modal and show category selection
       setShowHostJoinModal(false)
       setShowHostCategories(true)
       // Remove hostJoin flag from URL to prevent modal on refresh
-      try { window.history.replaceState(null, '', `/lobby?room=${roomId}`) } catch {}
-      
+      window.history.replaceState(null, '', `/lobby?room=${roomId}`)
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join as host')
     } finally {
@@ -223,10 +394,10 @@ export default function Lobby() {
   const handleSkipHostJoin = async () => {
     try {
       await initLobbyForRoom(roomId)
-      
+
       // Close modal and show lobby
       setShowHostJoinModal(false)
-      
+
     } catch (err) {
       console.error('Error setting up lobby:', err)
       setError('Failed to set up lobby')
@@ -235,11 +406,11 @@ export default function Lobby() {
 
   const handleHostCategoriesComplete = async () => {
     console.log('Host categories complete, setting up lobby...')
-    
+
     try {
       await initLobbyForRoom(roomId)
       setShowHostCategories(false)
-      
+
     } catch (err) {
       console.error('Error setting up lobby after categories:', err)
       setError(`Failed to set up lobby: ${err instanceof Error ? err.message : 'Unknown error'}`)
@@ -275,9 +446,18 @@ export default function Lobby() {
 
   // Cleanup on unmount
   useEffect(() => {
+    const autoFlags = autoFlagsRef.current
     return () => {
       if (channel) {
         unsubscribeFromRoom(channel)
+      }
+      if (deadlineTimerRef.current) {
+        clearTimeout(deadlineTimerRef.current)
+        deadlineTimerRef.current = null
+      }
+      if (autoFlags.voteTimer) {
+        clearTimeout(autoFlags.voteTimer)
+        autoFlags.voteTimer = null
       }
     }
   }, [channel])
@@ -297,7 +477,7 @@ export default function Lobby() {
       if (!hostDeviceId || roomId) return
       const { data, error } = await supabase
         .from('rooms')
-        .select('id,status,created_at')
+        .select('id,status,created_at,round_index,total_rounds')
         .eq('host_device_id', hostDeviceId)
         .neq('status', 'ended')
         .order('created_at', { ascending: false })
@@ -306,7 +486,10 @@ export default function Lobby() {
         return
       }
       const now = Date.now()
-      const fresh = (data || []).filter(r => (now - new Date(r.created_at).getTime()) < 30 * 60 * 1000)
+      const fresh = (data || []).filter(r =>
+        (now - new Date(r.created_at).getTime()) < 30 * 60 * 1000 &&
+        r.round_index < r.total_rounds,
+      )
       // Fetch counts for display
       const augmented = await Promise.all(fresh.map(async (r) => {
         const { count } = await supabase
@@ -318,7 +501,7 @@ export default function Lobby() {
       setResumeRooms(augmented)
     }
     load()
-  }, [hostDeviceId, roomId])
+  }, [computeExpiry, hostDeviceId, roomId])
 
   // If host is already a player, resume category selection if not yet chosen
   useEffect(() => {
@@ -331,11 +514,10 @@ export default function Lobby() {
           .eq('id', hostPlayerId)
           .single()
         if (error) return
-        const sel = (data as any)?.selected_categories
-        const hasSelections = Array.isArray(sel) && sel.length > 0
+        const hasSelections = parseStringArray(data?.selected_categories).length > 0
         setShowHostCategories(!hasSelections)
-      } catch {
-        // noop
+      } catch (error) {
+        console.error('Failed to restore host category state', error)
       }
     })()
   }, [hostPlayerId, roomId])
@@ -360,23 +542,21 @@ export default function Lobby() {
       unsubscribeFromRoom(channel)
       setChannel(null)
     }
+    if (deadlineTimerRef.current) {
+      clearTimeout(deadlineTimerRef.current)
+      deadlineTimerRef.current = null
+    }
     // Extra safety: ensure no lingering channels remain
-    try {
-      // @ts-ignore supabase-js v2 exposes getChannels
-      const chans = (supabase as any).getChannels ? (supabase as any).getChannels() : []
-      if (Array.isArray(chans)) {
-        chans.forEach((ch: any) => {
-          try { supabase.removeChannel(ch) } catch {}
-        })
-      }
-    } catch {}
+    supabase.getChannels().forEach((roomChannel) => {
+      void supabase.removeChannel(roomChannel)
+    })
     setRoomId('')
     setPlayers([])
     setQrCode('')
     setShowHostJoinModal(false)
     setShowHostCategories(false)
     // Clear query params immediately and navigate to splash home
-    try { window.history.replaceState(null, '', '/') } catch {}
+    window.history.replaceState(null, '', '/')
     navigate('/', { replace: true })
   }
 
@@ -391,7 +571,7 @@ export default function Lobby() {
         <div className="absolute top-16 right-6 text-5xl md:text-7xl opacity-15 md:opacity-25">⭐</div>
         <div className="absolute bottom-32 left-6 text-4xl md:text-6xl opacity-15 md:opacity-20">🎪</div>
         <div className="absolute bottom-8 right-6 text-6xl md:text-8xl opacity-10 md:opacity-15">😵</div>
-        
+
         <div className="relative z-10 w-full max-w-sm mx-auto" style={{
           background: 'rgba(15, 23, 42, 0.9)',
           backdropFilter: 'blur(15px)',
@@ -408,12 +588,12 @@ export default function Lobby() {
             <div className="font-medium mb-2" style={{
               color: '#cbd5e1',
               lineHeight: '1.3',
-              fontSize: '3rem'
+              fontSize: 'clamp(1.75rem, 8vw, 3rem)'
             }}>
               Join your
             </div>
             <div className="mb-2" style={{
-              fontSize: '5rem',
+              fontSize: '2.5rem',
               fontWeight: '900',
               lineHeight: '0.9',
               letterSpacing: '0.02em'
@@ -452,7 +632,7 @@ export default function Lobby() {
               {roomId} game
             </div>
           </div>
-          
+
           {error && (
             <div className="px-4 py-3 rounded mb-4" style={{
               background: 'rgba(239, 68, 68, 0.2)',
@@ -505,7 +685,7 @@ export default function Lobby() {
                 <button
                   key={color.name}
                   onClick={() => setHostColor(color)}
-                  className="p-4 text-3xl transition-all transform active:scale-95" 
+                  className="p-4 text-3xl transition-all transform active:scale-95"
                   style={{
                     background: 'transparent',
                     border: 'none'
@@ -529,8 +709,8 @@ export default function Lobby() {
               disabled={isJoiningAsHost || !hostName.trim()}
               className="w-full py-5 px-6 rounded-2xl font-bold text-lg transition-all active:scale-95"
               style={{
-                backgroundColor: isJoiningAsHost || !hostName.trim() 
-                  ? 'rgba(107, 114, 128, 0.3)' 
+                backgroundColor: isJoiningAsHost || !hostName.trim()
+                  ? 'rgba(107, 114, 128, 0.3)'
                   : 'rgba(255, 20, 147, 0.3)',
                 color: 'white',
                 border: isJoiningAsHost || !hostName.trim()
@@ -541,25 +721,25 @@ export default function Lobby() {
               }}
               onMouseEnter={(e) => {
                 if (!isJoiningAsHost && hostName.trim()) {
-                  e.target.style.backgroundColor = 'rgba(255, 20, 147, 0.5)'
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 20, 147, 0.5)'
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isJoiningAsHost && hostName.trim()) {
-                  e.target.style.backgroundColor = 'rgba(255, 20, 147, 0.3)'
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 20, 147, 0.3)'
                 }
               }}
             >
               {isJoiningAsHost ? 'JOINING...' : 'JOIN & OPEN LOBBY!'}
             </button>
-            
+
             <button
               onClick={handleSkipHostJoin}
               disabled={isJoiningAsHost}
               className="w-full py-4 px-6 rounded-2xl font-semibold text-base transition-all active:scale-95"
               style={{
-                backgroundColor: isJoiningAsHost 
-                  ? 'rgba(107, 114, 128, 0.3)' 
+                backgroundColor: isJoiningAsHost
+                  ? 'rgba(107, 114, 128, 0.3)'
                   : 'rgba(0, 245, 255, 0.3)',
                 color: 'white',
                 border: isJoiningAsHost
@@ -571,12 +751,12 @@ export default function Lobby() {
               }}
               onMouseEnter={(e) => {
                 if (!isJoiningAsHost) {
-                  e.target.style.backgroundColor = 'rgba(0, 245, 255, 0.5)'
+                  e.currentTarget.style.backgroundColor = 'rgba(0, 245, 255, 0.5)'
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isJoiningAsHost) {
-                  e.target.style.backgroundColor = 'rgba(0, 245, 255, 0.3)'
+                  e.currentTarget.style.backgroundColor = 'rgba(0, 245, 255, 0.3)'
                 }
               }}
             >
@@ -591,9 +771,9 @@ export default function Lobby() {
   // Host Category Selection
   if (showHostCategories) {
     return (
-      <CategoryOptIn 
-        playerId={hostPlayerId} 
-        roomId={roomId} 
+      <CategoryOptIn
+        playerId={hostPlayerId}
+        roomId={roomId}
         onComplete={handleHostCategoriesComplete}
       />
     )
@@ -660,47 +840,93 @@ export default function Lobby() {
     )
   }
 
+  const owner = players.find((player) => player.id === currentOwnerId)
+  const ownerAnswer = revealItems.find((item) => item.id === roundResults.ownerAnswerId)
+  const topVoteCount = Math.max(0, ...Object.values(roundResults.voteCounts))
+  const crowdFavourites = revealItems.filter(
+    (item) => topVoteCount > 0 && roundResults.voteCounts[item.id] === topVoteCount,
+  )
+  const rank = (scores: Record<string, number>) => players
+    .map((player) => ({ ...player, score: scores[player.id] || 0 }))
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+  const chameleonRanking = rank(leaderboards.chameleon)
+  const crowdRanking = rank(leaderboards.crowd)
+  const gameComplete = roundIndex >= totalRounds
+  const chameleonHighScore = chameleonRanking[0]?.score ?? 0
+  const crowdHighScore = crowdRanking[0]?.score ?? 0
+  const chameleonChampions = chameleonRanking.filter((player) => player.score === chameleonHighScore)
+  const crowdChampions = crowdRanking.filter((player) => player.score === crowdHighScore)
+
   return (
-    <div className="min-h-screen bg-gray-900 p-8">
-      <div className="max-w-4xl mx-auto text-center">
-        <h1 className="text-4xl font-bold text-white mb-1">Room: {roomId}</h1>
+    <div className="whatever-stage min-h-screen p-5 text-[#f3efe4] md:p-8">
+      <div className="mx-auto max-w-5xl text-center">
+        <header className="mb-6 flex items-center justify-between border-b border-white/[.07] pb-5 text-left">
+          <WhateverMark compact />
+          <div><div className="eyebrow text-[#777f89]">Room</div><div className="text-3xl font-black tracking-[-.04em] text-[#e8bd45]">{roomId}</div></div>
+        </header>
         {expiresInSec != null && !roundDeadline && (
-          <div className="text-sm text-gray-400 mb-4">
+          <div className="mb-4 text-sm text-[#777f89]">
             Auto-deletes in {Math.floor(expiresInSec / 60)}:{String(expiresInSec % 60).padStart(2, '0')}
           </div>
         )}
         {/* Question view during Submit phase */}
-        {roundDeadline && (
-          <div className="mb-8 bg-gray-800 p-6 rounded-lg text-left">
-            <div className="text-gray-300 text-sm">Category</div>
-            <div className="text-2xl font-bold text-white capitalize">
+        {(roundStarted || roundDeadline) && roundPhase !== 'guessing' && roundPhase !== 'results' && (
+          <div className="tv-frame mb-8 rounded-[1.75rem] p-7 text-left">
+            <div className="eyebrow text-[#e8bd45]">Round {roundIndex + 1} of {totalRounds}</div>
+            <div className="mt-2 text-sm font-bold uppercase tracking-[.16em] text-[#747d88]">
               {(currentCategory || previewCategory) ? (currentCategory || previewCategory).replaceAll('_',' ') : '—'}
             </div>
-            <div className="mt-3 text-lg text-gray-100">
-              Prompt: <span className="font-semibold">{currentPrompt || previewPrompt || '—'}</span>
+            <div className="mt-5 text-3xl font-black leading-tight tracking-[-.04em] text-[#f3efe4] md:text-5xl">
+              {currentPrompt || previewPrompt || '—'}
             </div>
             {!roundDeadline ? (
               <div className="mt-4 flex items-center justify-between text-gray-200">
-                <div className="text-gray-300">Press Start to begin the 60s round.</div>
-                <button
-                  onClick={async () => {
-                    try {
-                      if (players.length < 3 || categoriesLocked === 0) return
-                      const opts = previewCategory && previewPrompt ? { category: previewCategory, promptText: previewPrompt } : undefined
-                      await startRound(roomId, opts as any)
-                    } catch (e) {
-                      console.error('Failed to start round', e)
-                    }
-                  }}
-                  disabled={players.length < 3 || categoriesLocked === 0}
-                  className={`px-5 py-2 rounded font-semibold text-white ${
-                    players.length < 3
-                      ? 'bg-gray-600 cursor-not-allowed opacity-60'
-                      : 'bg-green-600 hover:bg-green-700'
-                  }`}
-                >
-                  {players.length < 3 ? `Need ${3 - players.length} more` : (categoriesLocked === 0 ? 'Pick shared categories' : 'Start')}
-                </button>
+                {!roundStarted ? (
+                  <>
+                    <div className="text-gray-300">Press Start to begin the round.</div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          if (players.length < 3 || categoriesLocked === 0) return
+                          const opts = previewCategory && previewPrompt ? { category: previewCategory, promptText: previewPrompt } : undefined
+                          await startRound(roomId, opts)
+
+                          // If host is also a player, redirect them to mobile player view
+                          if (hostPlayerId) {
+                            // Open player view in a new tab/window so host can keep lobby open
+                            window.open(`/join?room=${roomId}`, '_blank')
+                          }
+                        } catch (e) {
+                          console.error('Failed to start round', e)
+                        }
+                      }}
+                      disabled={players.length < 3 || categoriesLocked === 0}
+                      className={`px-5 py-2 rounded font-semibold text-white ${
+                        players.length < 3
+                          ? 'bg-gray-600 cursor-not-allowed opacity-60'
+                          : 'bg-green-600 hover:bg-green-700'
+                      }`}
+                    >
+                      {players.length < 3 ? `Need ${3 - players.length} more` : (categoriesLocked === 0 ? 'Pick shared categories' : 'Start Game')}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-gray-300">Round ready! Begin countdown when all players are ready.</div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await beginRoundCountdown(roomId)
+                        } catch (e) {
+                          console.error('Failed to begin countdown', e)
+                        }
+                      }}
+                      className="px-5 py-2 rounded font-semibold text-white bg-orange-600 hover:bg-orange-700"
+                    >
+                      Start
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <div className="mt-4 flex items-center justify-between text-gray-200">
@@ -708,14 +934,118 @@ export default function Lobby() {
                   Waiting for responses…
                   <span className="ml-2 text-sm text-gray-300">Submissions: <span className="font-semibold">{submissionCount}</span> / {players.length}</span>
                 </div>
-                <RoundCountdown deadline={roundDeadline} />
+                <CountdownClock deadline={roundDeadline} totalSeconds={60} label="Answer" />
               </div>
             )}
           </div>
         )}
 
         {/* Grid area: If in Question view, show only Players with ticks; otherwise show QR + Players */}
-        {roundDeadline ? (
+        {roundPhase === 'guessing' ? (
+          <div className="tv-frame mb-8 overflow-hidden rounded-[1.75rem] text-left">
+            <div className="border-b border-white/[.07] px-8 py-6 text-center">
+              <div className="eyebrow text-[#35d8e6]">Round {roundIndex + 1} · The reveal</div>
+              <h2 className="mt-3 text-3xl font-black tracking-[-.045em] md:text-5xl">Which answer sounds like {owner?.name || 'the Round Owner'}?</h2>
+              <p className="mt-3 text-[#9da4ae]">Players are guessing the owner and choosing the answer they loved most.</p>
+              {voteDeadline && <div className="mt-4 flex justify-center"><CountdownClock deadline={voteDeadline} totalSeconds={20} label="Vote" /></div>}
+            </div>
+            <div className="grid gap-4 p-6 md:grid-cols-2">
+              {revealItems.map((item, index) => (
+                <div key={item.id} className="paper-slip rounded-2xl p-5">
+                  <div className="mb-3 text-xs font-black uppercase tracking-[0.25em] text-[#b52c72]">Answer {index + 1}</div>
+                  <p className="text-xl font-semibold leading-snug">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : roundPhase === 'results' ? (
+          <div className="tv-frame mb-8 overflow-hidden rounded-[1.75rem]">
+            <div className="border-b border-white/[.07] px-8 py-7 text-center">
+              <div className="eyebrow text-[#e8bd45]">{gameComplete ? 'Final results' : `Round ${roundIndex} results`}</div>
+              <h2 className="mt-3 text-4xl font-black tracking-[-.045em] md:text-6xl">{owner?.avatar} {owner?.name || 'The Round Owner'}</h2>
+              <p className="mt-2 text-lg text-slate-300">was hiding in plain sight</p>
+            </div>
+
+            <div className="grid gap-5 p-6 lg:grid-cols-2">
+              <div className="rounded-2xl border border-cyan-400/25 bg-cyan-400/5 p-6">
+                <div className="text-xs font-black uppercase tracking-[0.25em] text-cyan-300">The owner's answer</div>
+                <p className="mt-3 text-2xl font-bold leading-snug">“{ownerAnswer?.text || 'Answer unavailable'}”</p>
+                <p className="mt-4 text-sm text-slate-300">
+                  {roundResults.correctGuessers.length} {roundResults.correctGuessers.length === 1 ? 'player saw' : 'players saw'} through the disguise.
+                  {roundResults.ownerSweetSpot ? ` ${owner?.name || 'The owner'} hit the sweet spot and earned 3 Chameleon points.` : ''}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-amber-300/25 bg-amber-300/5 p-6">
+                <div className="text-xs font-black uppercase tracking-[0.25em] text-amber-300">Crowd favourite</div>
+                {crowdFavourites.length > 0 ? crowdFavourites.map((item) => (
+                  <p key={item.id} className="mt-3 text-2xl font-bold leading-snug">“{item.text}”</p>
+                )) : <p className="mt-3 text-xl text-slate-300">No favourite emerged this round.</p>}
+                {topVoteCount > 0 && <p className="mt-4 text-sm text-slate-300">{topVoteCount} {topVoteCount === 1 ? 'vote' : 'votes'}</p>}
+              </div>
+            </div>
+
+            <div className="grid gap-5 px-6 pb-6 md:grid-cols-2">
+              {[{ title: 'Chameleon', accent: 'text-cyan-300', rows: chameleonRanking }, { title: 'Crowd', accent: 'text-fuchsia-300', rows: crowdRanking }].map((board) => (
+                <div key={board.title} className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                  <h3 className={`text-xl font-black uppercase tracking-[0.2em] ${board.accent}`}>{board.title}</h3>
+                  <div className="mt-4 space-y-2">
+                    {board.rows.map((player, index) => (
+                      <div key={player.id} className="flex items-center gap-3 rounded-xl bg-black/20 px-4 py-3">
+                        <span className="w-6 text-sm font-bold text-slate-400">{index + 1}</span>
+                        <span className="text-xl">{player.avatar}</span>
+                        <span className="flex-1 font-semibold">{player.name}</span>
+                        <span className="text-xl font-black">{player.score}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {gameComplete && (
+              <div className="mx-6 mb-6 grid gap-4 rounded-2xl border border-amber-300/30 bg-amber-300/5 p-6 text-center md:grid-cols-2">
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.22em] text-cyan-300">Chameleon champion{chameleonChampions.length > 1 ? 's' : ''}</div>
+                  <div className="mt-2 text-2xl font-black">{chameleonChampions.map((player) => `${player.avatar} ${player.name}`).join(' & ')}</div>
+                </div>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.22em] text-fuchsia-300">Crowd favourite{crowdChampions.length > 1 ? 's' : ''}</div>
+                  <div className="mt-2 text-2xl font-black">{crowdChampions.map((player) => `${player.avatar} ${player.name}`).join(' & ')}</div>
+                </div>
+              </div>
+            )}
+
+            <div className="border-t border-white/10 p-6 text-center">
+              {gameComplete ? (
+                <div>
+                  <div className="text-2xl font-black text-amber-300">Game complete</div>
+                  <p className="mt-2 text-sm text-slate-400">Six rounds finished. Thanks for playing!</p>
+                  <button
+                    onClick={handleLeaveRoom}
+                    className="mt-5 rounded-xl border border-white/20 bg-white/10 px-5 py-3 font-bold text-white hover:bg-white/15"
+                  >
+                    Back to title
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={async () => {
+                    try {
+                      setError('')
+                      await startRound(roomId)
+                    } catch (nextRoundError) {
+                      setError(nextRoundError instanceof Error ? nextRoundError.message : 'Failed to start the next round')
+                    }
+                  }}
+                  className="rounded-2xl border-2 border-fuchsia-400 bg-fuchsia-500/20 px-8 py-4 text-xl font-black text-white transition hover:bg-fuchsia-500/35 active:scale-95"
+                >
+                  Next round →
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (roundStarted || roundDeadline) ? (
           <div className="grid md:grid-cols-2 gap-8 mb-8">
             <div className="hidden md:block" />
             <div className="bg-gray-800 p-6 rounded-lg">
@@ -738,16 +1068,16 @@ export default function Lobby() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-8 mb-8">
-            <div className="bg-white p-6 rounded-lg">
-              <h2 className="text-xl font-bold mb-4">Scan to Join</h2>
-              {qrCode && (<img src={qrCode} alt="QR Code" className="mx-auto max-w-64" />)}
-              <p className="text-sm text-gray-600 mt-2">Or go to: {window.location.origin}/join?room={roomId}</p>
+            <div className="material-panel rounded-[1.75rem] p-6">
+              <div className="eyebrow mb-4 text-[#e8bd45]">Scan to join</div>
+              {qrCode && (<div className="mx-auto w-fit rounded-[1.4rem] bg-[#f3efe4] p-3"><img src={qrCode} alt="QR Code" className="max-w-56" /></div>)}
+              <p className="mt-3 text-sm text-[#7f8792]">Or open {window.location.origin}/join?room={roomId}</p>
             </div>
-            <div className="bg-gray-800 p-6 rounded-lg">
-              <h2 className="text-xl font-bold text-white mb-4">Players ({players.length}/8)</h2>
+            <div className="material-panel rounded-[1.75rem] p-6 text-left">
+              <div className="eyebrow mb-4 text-[#35d8e6]">Players · {players.length}/8</div>
               <div className="space-y-2">
                 {players.map((player) => (
-                  <div key={player.id} className="flex items-center space-x-3 p-3 bg-gray-700 rounded">
+                  <div key={player.id} className="flex items-center space-x-3 rounded-2xl border border-white/[.06] bg-black/20 p-3">
                     <span className="text-3xl">{player.avatar}</span>
                     <div className="flex-1">
                       <span className="text-white font-medium text-lg capitalize">{player.name}</span>
@@ -775,12 +1105,12 @@ export default function Lobby() {
                     onClick={async () => {
                       try {
                         const opts = previewCategory && previewPrompt ? { category: previewCategory, promptText: previewPrompt } : undefined
-                        await startRound(roomId, opts as any)
+                        await startRound(roomId, opts)
                       } catch (e) {
                         console.error('Failed to start round', e)
                       }
                     }}
-                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded font-semibold"
+                    className="rounded-full bg-[#f24b9d] px-6 py-3 font-black text-[#170a12] transition hover:bg-[#ff6aae]"
                   >
                     Start
                   </button>
@@ -792,23 +1122,12 @@ export default function Lobby() {
         {!roundDeadline && (
           <button onClick={handleLeaveRoom} className="mb-6 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded">Leave Room</button>
         )}
-        {/* Round controls (debug/advanced) hidden during focused Question view */}
-        {false && roundDeadline && (
-          <div className="mb-6 bg-gray-800 p-4 rounded-lg text-left text-white">
-            <h3 className="text-lg font-semibold mb-2">Round Controls</h3>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={async () => { try { await revealRound(roomId) } catch (e) { setError((e as Error).message) } }} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded">Reveal Answers</button>
-              <button onClick={async () => { try { await startVotePhase(roomId) } catch (e) { setError((e as Error).message) } }} className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded">Start Vote (30s)</button>
-              <button onClick={async () => { try { await finalizeRound(roomId) } catch (e) { setError((e as Error).message) } }} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Finalize Results</button>
-            </div>
-          </div>
-        )}
         {expiresInSec != null && expiresInSec <= 300 && (
           <div className="mb-4 p-4 bg-yellow-200 text-yellow-900 rounded-lg">
             This room will auto-delete in {Math.floor(expiresInSec / 60)}:{String(expiresInSec % 60).padStart(2, '0')} unless activity resumes.
           </div>
         )}
-        
+
       </div>
     </div>
   )

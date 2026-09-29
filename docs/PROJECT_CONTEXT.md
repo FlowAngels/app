@@ -1,0 +1,259 @@
+# Whatever! — project context and decision record
+
+Last reviewed: 2026-09-29
+
+## Product intent
+
+Whatever! is a same-room social game for 3–8 people. A shared host screen runs
+the game and phones act as private controllers. Everyone answers the same
+creative prompt. Players then separately:
+
+1. guess which answer belongs to the rotating Round Owner; and
+2. choose the answer they enjoyed most.
+
+The intended hook is the tension between sounding recognisably like yourself
+and delighting the room. It is not a personal-trivia game about the Round Owner.
+
+The original product vision has three ways to form a game:
+
+1. **Couch play:** start the shared board on a TV, open a lobby, and let nearby
+   players join from their phones by scanning its QR code.
+2. **Private remote play:** share an invite link or room code so people in
+   different locations can join the same private game.
+3. **Open online play:** discover and join public games, with optional
+   non-human players able to participate or fill empty seats.
+
+These are delivery modes around the same round rules, not separate games. The
+current vertical slice deliberately validates couch play first because its
+shared board creates the clearest ceremony and the lowest moderation burden.
+Private remote rooms are the next plausible extension. Public matchmaking and
+non-human players are later product layers, not requirements for proving the
+core loop.
+
+The clarified scoring model rewards both recognition and creativity:
+
+- each correct guesser receives +2 Chameleon points;
+- a decoy author receives +1 Chameleon point whenever another eligible player
+  mistakes that answer for the Round Owner's;
+- the Round Owner receives +3 Chameleon points only when some, but not all,
+  eligible guessers identify them; and
+- each favourite vote gives the answer's author +1 Crowd point.
+
+This combines the anonymous bluffing inherited from Balderdash, the
+some-but-not-all recognition target inherited from Dixit, and a separate
+Big-Fat-Quiz-style reward for the answer the room most enjoyed. Keep the
+Chameleon and Crowd standings distinct so neither skill becomes incidental.
+
+## Recovered state
+
+The codebase is a secured interactive prototype, not yet a playable MVP. It
+contains room creation and joining, QR links, private category selection, round
+creation, answer entry, anonymous reveal data, a combined guess/favourite
+controller, preliminary results, and JSON leaderboards.
+
+Baseline cleanup completed locally on 2026-09-29:
+
+- the recovered 2025 working tree is preserved in commit `678780b`;
+- a clean `npm ci`, tests, lint, and production build pass;
+- eight tests cover scoring boundaries and all-player category consensus;
+- the dependency tree has zero known audit vulnerabilities;
+- database types, a reconstructed migration, and CI checks are versioned; and
+- the original single-favourite, +2 guess, and +3 sweet-spot rules are restored.
+
+The live Supabase project exists and contains prototype data. A new approved
+browser-safe publishable key restored local access after its recovered keys
+returned HTTP 401. Its schema has been compared with the reconstructed
+migration. A local JSON safety copy and a data-aware reconciliation migration
+were prepared and rehearsed against both fresh and populated prototype states.
+Tim explicitly approved the live operation, and the migration was applied and
+verified on 2026-09-29. See `supabase/LIVE_AUDIT_2026-09-29.md` and
+`supabase/RECOVERY_RUNBOOK.md`.
+
+The next security layer was prepared and deployed with Tim's explicit approval:
+`20260929020000_authenticated_commands.sql` adds anonymous-user ownership and
+transactional commands for room creation/joining, category choices, round
+start, answering, reveal, guessing, voting, and idempotent final scoring. Its
+rehearsal completes a three-player round and verifies the original scoring
+rules. The live verification found all 11 functions, both ownership indexes,
+and the intended execution grants.
+
+The client uses the authenticated-command path through
+`VITE_USE_AUTHENTICATED_COMMANDS=true` in the ignored local environment. The
+secure path covers all material game writes; a follow-up
+migration preserves the controller's ability to clear a favourite vote and
+keeps category consensus correct as players disconnect. That hardening was
+applied and verified live on 2026-09-29.
+
+The coordinated read-security migration
+`20260929040000_secure_reads_and_rls.sql` is live. Anonymous Auth is enabled;
+join-safe room previews, answer-free submission progress, refreshable reveal
+items, member-scoped reads, and write-denying RLS policies now protect the live
+project. A five-session live test completed a full three-player round and
+verified private answers, outsider isolation, ownership checks, vote clearing,
+deadline enforcement, original scoring, and idempotent finalisation. Its test
+room was removed and the original live row counts were restored.
+
+## Fidelity references
+
+- `src/lib/prompts.ts` now contains a focused 20-prompt Headline Hijack pack,
+  grounded in the two examples from the original specification. It is ready for
+  playtesting, not yet validated content. Law or Nah and Meme Mash remain
+  deferred until the central loop earns further investment.
+- The original splash mock-up remains outside this nested Git repository at
+  `../assets/Mock-up Splash screen.png`. The current coded splash is an
+  approximation and is not approved as a faithful replacement.
+- No polished TV-lobby reference survives in the recovered repository or its
+  Git history; the preserved lobby screenshots show the earlier utilitarian
+  implementation. The `/demo` lobby is therefore a new reconstruction using
+  the splash's dark, neon visual language, not a claim to reproduce lost work.
+- Keep `Whatever!` as a working title until trademark and discoverability have
+  been checked for any public release.
+
+## Visual direction
+
+The visual north star is **a premium contemporary TV game show invaded by
+strange handmade creatures**. The surviving splash mock-up supplies the
+material cues—dark woven surfaces, knitted characters, cyan/magenta light and
+mustard accents—but not a licence to reproduce late-1980s game-show graphics or
+craft-store kitsch.
+
+The first visual-system pass was implemented on 2026-09-29 across the real
+splash, TV lobby/round states, mobile join/answer/vote/results surfaces, and the
+`/demo` vertical slice. It introduces code-native felt characters, restrained
+neon wordmarks, paper answer slips, modern editorial type, quieter phone shells
+and material panels. Characters are used as emotional punctuation in the
+lobby, reveal and results; active answering and voting screens stay visually
+quiet. This direction is implemented for evaluation, not yet approved as final
+art.
+
+Guardrails:
+
+- use neon as a focused light source, not a border around every component;
+- keep texture subtle enough that TV copy remains readable across a room;
+- reserve the creatures for reactions, identity and ceremony;
+- keep phones calmer and more task-oriented than the shared TV; and
+- reject pixel fonts, arcade chrome, faux-retro interfaces and gratuitous
+  cuteness even when they fit the nominal party-game theme.
+
+## Material product and engineering gaps
+
+1. The host screen does not present reveal, ownership, results, leaderboards,
+   next-round rotation, game end, and replay as one coherent sequence.
+2. Although deadlines, transitions, and scoring are persisted and
+   transactional, a sleeping or disconnected host can still stall automatic
+   phase progression.
+3. Refresh/rejoin does not yet reconstruct every screen and local interaction
+   state cleanly.
+4. The UI claims room expiry, but no cleanup job is versioned.
+5. CAPTCHA or equivalent abuse protection is not configured for anonymous
+   sign-ins; add it with a matching client flow before sharing a public URL.
+6. The 20 Headline Hijack prompts have not yet been playtested for recognisable
+   voice and laughter; the two deferred modes have no release-ready content.
+7. Remote invitations have no dedicated hostless/shared-board experience,
+   communications layer, or remote-play onboarding yet.
+8. Non-human players, public-room discovery, matchmaking, moderation, abuse
+   controls, and persistent public identity are not implemented.
+
+## Current plan
+
+Build one faithful vertical slice before broadening the game:
+
+`lobby → prompt → answer → reveal → guess → favourite → results → next round`
+
+Use Headline Hijack first. The authoritative command boundary, persisted
+deadlines, and idempotent scoring are now in place; finish the shared host
+sequence, human-readable results, dual leaderboard, next-round rotation, and
+refresh/rejoin recovery. The exit condition is three real phones plus one host
+completing six rounds without developer intervention.
+
+The first host vertical-slice pass was implemented on 2026-09-29. The shared
+screen now presents anonymous revealed answers, the Round Owner and their
+answer, the Chameleon outcome, the crowd favourite, named dual leaderboards,
+and a next-round handoff. Player results now mirror those outcomes, and the
+answer timer visibly updates. A browser review also found that the Tailwind 4
+build was using legacy CSS directives; switching to the supported import
+restored the intended styling across the lobby and mobile screens. The splash
+was made responsive and visually checked against the recovered mock-up. This
+slice still needs the exit-condition multi-device playtest before it can be
+called a playable MVP.
+
+The six-round boundary now crowns tied or outright Chameleon and Crowd
+champions and returns the host to the title instead of offering an accidental
+seventh round. A server-side end-game/replay command remains future work; it
+should not be added to the live project before the six-round playtest justifies
+that extra lifecycle.
+
+Player refresh recovery now restores an existing answer, guess, and favourite
+from the database. In particular, opening the voting screen no longer clears a
+previously saved favourite before hydration completes. Host phase/deadline
+recovery is present, but the full refresh and disconnect matrix still belongs
+in the multi-device exit test.
+
+An unattended live substitute for that engineering gate passed on 2026-09-29:
+one host, three players, and one outsider completed all six rounds using
+separate anonymous sessions. It verified two full owner rotations, player and
+host session replacement, disconnect/reconnect, private-answer isolation,
+outsider denial, direct-write rejection, deadline enforcement, scoring, and
+idempotent finalisation. The generated room `A9EP` was removed and the original
+live counts were restored. This is strong functional evidence, but it does not
+replace the later human playtest for comprehension, pacing, or fun.
+
+An internal `/demo` dress rehearsal now presents one shared TV and three
+simulated phones across a 32-step game: lobby, five phases for each of six
+distinct rounds, then final champions. Round owners rotate, prompts and answers
+change, and score totals advance. It supports full-game auto-play, direct round
+navigation, and manual stepping; writes no game data; and is included in a
+production preview only when `VITE_ENABLE_PLAYTEST_DEMO=true`. Use it to review
+layout, copy, hierarchy, pacing, and choreography before inviting people; do
+not treat it as evidence of comprehension or enjoyment.
+
+The mobile rehearsal and real controller now omit a player's own answer from
+guessing and favourite choices. Voting is presented as two simple steps—spot
+the Round Owner, then pick a favourite—instead of placing two competing actions
+on every answer card. The post-round phone recap shows the Round Owner, both
+round winners, running point totals, and the player's rank on both leaderboards.
+Timed phases now use a prominent circular countdown on the shared TV and a
+compact top-corner countdown on phones. Both turn urgent in the final ten
+seconds, keeping the deadline legible without competing with the phone task.
+
+`20260929050000_round_scoring_and_results.sql` is live. It adds the agreed +1
+decoy award and persists post-reveal answer ownership plus per-round point
+awards so the mobile recap can name its winners without exposing ownership
+during voting. Tim explicitly approved the deployment on 2026-09-29. A new
+six-round live rehearsal then verified decoy and Crowd scoring, post-reveal
+ownership, privacy, refresh/reconnect recovery, and repeat-safe finalisation.
+The three temporary rooms created while applying and verifying the migration
+were removed, and a follow-up query confirmed no `live-verify-` rooms remain.
+
+Then run five observed playtests across different relationship types. Continue
+only if at least three groups voluntarily play another game or ask to use it
+again. Treat one excellent personal game night as success; a company is not the
+default outcome.
+
+If the loop earns further investment, test a host-paid occasion pack or private
+custom room before considering subscriptions. Do not add payments before repeat
+hosting behaviour is demonstrated.
+
+If couch play passes that gate, extend in this order:
+
+1. private remote rooms using the existing link/code model and a board view any
+   participant can open;
+2. clearly labelled non-human fill-in players, run server-side so they obey the
+   same privacy and timing rules as people; and
+3. public room discovery only after identity, reporting, moderation, room
+   visibility, and abuse economics have been designed.
+
+Public matchmaking is the largest scope increase: it changes Whatever! from a
+game used among invited people into a social platform involving strangers. Do
+not treat it as a simple lobby-list feature.
+
+## Boundaries
+
+- Do not deploy, alter a live database, or enable payments without Tim's
+  explicit approval.
+- Treat the recovered named categories as unverified content scaffolding, not
+  settled product intent. Validate one varied prompt deck before adding modes.
+- Do not pivot to personal questions without an explicit product decision and
+  comparative playtest.
+- Realtime distributes persisted state; it must not be the sole source of game
+  truth.

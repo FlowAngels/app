@@ -1,69 +1,54 @@
-# React + TypeScript + Vite
+# Whatever!
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A revived, couch-first social party game. One shared screen hosts the game;
+3–8 players use their phones to answer, identify the round owner's answer, and
+vote for a favourite. The longer product vision also includes private remote
+rooms, optional non-human players, and eventually moderated public games.
 
-Currently, two official plugins are available:
+The secured six-round vertical slice compiles and has passed an unattended live
+multi-session game, but it still needs human playtesting before it is a proven
+MVP. Read
+[`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md) before changing product
+behaviour or expanding scope.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Local setup
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm ci
+cp .env.example .env.local
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env.local`. Never
+commit that file.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Routes:
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- `/` — landing screen
+- `/lobby` — shared host screen
+- `/join?room=CODE` — player controller
+- `/demo` — synthetic TV + three-phone dress rehearsal; available during local
+  development, or in a private preview built with
+  `VITE_ENABLE_PLAYTEST_DEMO=true`
+
+The demo uses deterministic fake players and does not write game data. It is a
+visual and choreography check, complementing rather than replacing the separate
+live Supabase test. Press **Play all 6 rounds** to run the 32-step rehearsal from
+lobby through final champions; use the arrows or round buttons to inspect a
+specific moment.
+
+## Checks
+
+```bash
+npm run build
+npm run lint
+npm test
+npm run test:migrations
 ```
+
+The clean install, build, lint, 17 behavior tests, fresh/populated database
+migration rehearsals, and a six-round live test pass as of 2026-09-29. `npm
+audit` reports zero known vulnerabilities. The original Supabase project is
+reconciled and secured with anonymous Auth, authenticated commands, safe reads,
+and RLS; read
+[`supabase/README.md`](supabase/README.md) before changing the live backend.
