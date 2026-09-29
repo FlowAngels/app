@@ -33,7 +33,9 @@ Routes:
 
 The demo uses deterministic fake players and does not write game data. It is a
 visual and choreography check, complementing rather than replacing the separate
-live Supabase test.
+live Supabase test. Press **Play all 6 rounds** to run the 32-step rehearsal from
+lobby through final champions; use the arrows or round buttons to inspect a
+specific moment.
 
 ## Checks
 

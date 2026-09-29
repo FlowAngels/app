@@ -167,12 +167,13 @@ live counts were restored. This is strong functional evidence, but it does not
 replace the later human playtest for comprehension, pacing, or fun.
 
 An internal `/demo` dress rehearsal now presents one shared TV and three
-simulated phones through seven deterministic phases: lobby, round-ready,
-answering, reveal, guess/favourite, results, and final champions. It supports
-manual stepping and auto-play, writes no game data, and is included in a
+simulated phones across a 32-step game: lobby, five phases for each of six
+distinct rounds, then final champions. Round owners rotate, prompts and answers
+change, and score totals advance. It supports full-game auto-play, direct round
+navigation, and manual stepping; writes no game data; and is included in a
 production preview only when `VITE_ENABLE_PLAYTEST_DEMO=true`. Use it to review
-layout, copy, hierarchy, and choreography before inviting people; do not treat
-it as evidence of comprehension or enjoyment.
+layout, copy, hierarchy, pacing, and choreography before inviting people; do
+not treat it as evidence of comprehension or enjoyment.
 
 Then run five observed playtests across different relationship types. Continue
 only if at least three groups voluntarily play another game or ask to use it
