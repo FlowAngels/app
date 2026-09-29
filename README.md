@@ -1,10 +1,13 @@
 # Whatever!
 
-A recovered prototype of a same-room social party game. One shared screen hosts
-the game; 3–8 players use their phones to answer, identify the round owner's
-answer, and vote for a favourite.
+A revived, couch-first social party game. One shared screen hosts the game;
+3–8 players use their phones to answer, identify the round owner's answer, and
+vote for a favourite. The longer product vision also includes private remote
+rooms, optional non-human players, and eventually moderated public games.
 
-This repository compiles, but it is not yet a complete MVP. Read
+The secured six-round vertical slice compiles and has passed an unattended live
+multi-session game, but it still needs human playtesting before it is a proven
+MVP. Read
 [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md) before changing product
 behaviour or expanding scope.
 
@@ -34,8 +37,9 @@ npm test
 npm run test:migrations
 ```
 
-The clean install, build, lint, behavior tests, and fresh/populated database
-migration rehearsals pass as of 2026-09-29. `npm audit` reports zero known
-vulnerabilities. A new browser-safe publishable key reconnects the local app to
-the original Supabase project; read
+The clean install, build, lint, 12 behavior tests, fresh/populated database
+migration rehearsals, and a six-round live test pass as of 2026-09-29. `npm
+audit` reports zero known vulnerabilities. The original Supabase project is
+reconciled and secured with anonymous Auth, authenticated commands, safe reads,
+and RLS; read
 [`supabase/README.md`](supabase/README.md) before changing the live backend.

@@ -5,12 +5,14 @@ recovered implementation, original intent, current risks, and revival plan.
 
 ## Product intent
 
-Whatever! is a same-room social game for 3–8 people. A shared host screen runs
-the game and phones act as private controllers. Everyone answers the same
-creative prompt; players then try to recognise the Round Owner's answer while
-also voting for the answer they most enjoyed. Its intended advantage over a
-generic prompt-and-vote game is this tension between recognisable voice and
-crowd appeal.
+Whatever! is a couch-first social game for 3–8 people. A shared host screen runs
+the initial mode and phones act as private controllers. Everyone answers the
+same creative prompt; players then try to recognise the Round Owner's answer
+while also voting for the answer they most enjoyed. Its intended advantage over
+a generic prompt-and-vote game is this tension between recognisable voice and
+crowd appeal. The longer vision includes private remote rooms, optional
+non-human players, and eventually moderated public matchmaking; do not make the
+current couch validation slice an architectural dead end.
 
 Keep the round legible from across a room, minimise host babysitting, and never
 reveal a player's category choices or answer ownership before results.
@@ -20,8 +22,8 @@ reveal a player's category choices or answer ownership before results.
 - Stack: React, TypeScript, Vite, Tailwind, Supabase Postgres + Realtime.
 - Routes: `/`, `/lobby`, and `/join` (`/host` redirects to `/lobby`).
 - Do not expose or commit `.env.local`.
-- Do not assume the live Supabase schema matches the planning document. Add
-  versioned migrations before making schema changes.
+- The live Supabase schema is reconciled through the versioned migrations dated
+  2026-09-29. Add and rehearse a new migration before any further schema change.
 - Recovered 2025 work is preserved in commit `678780b`. Keep later changes
   small and reviewable.
 - Do not deploy, alter the live database, or enable payments without Tim's
