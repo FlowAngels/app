@@ -96,6 +96,10 @@ room was removed and the original live row counts were restored.
 - The original splash mock-up remains outside this nested Git repository at
   `../assets/Mock-up Splash screen.png`. The current coded splash is an
   approximation and is not approved as a faithful replacement.
+- No polished TV-lobby reference survives in the recovered repository or its
+  Git history; the preserved lobby screenshots show the earlier utilitarian
+  implementation. The `/demo` lobby is therefore a new reconstruction using
+  the splash's dark, neon visual language, not a claim to reproduce lost work.
 - Keep `Whatever!` as a working title until trademark and discoverability have
   been checked for any public release.
 

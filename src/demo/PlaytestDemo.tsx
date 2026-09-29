@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { DEMO_PHASES, type DemoPhase } from './demoPhases'
+import { generateQRCode } from '../lib/qr'
 
 const players = [
   { name: 'Ali', avatar: '🔵', answer: 'replace every meeting with competitive karaoke' },
@@ -85,15 +86,51 @@ function Phone({ playerIndex, phase }: { playerIndex: number; phase: DemoPhase }
 
 function TvBoard({ phase }: { phase: DemoPhase }) {
   const answers = useMemo(() => [...players].sort((a, b) => a.answer.localeCompare(b.answer)), [])
+  const [demoQr, setDemoQr] = useState('')
+
+  useEffect(() => {
+    generateQRCode(`${window.location.origin}/join?room=DEMO`).then(setDemoQr)
+  }, [])
+
   return (
-    <div className="aspect-video w-full overflow-hidden rounded-2xl border border-cyan-400/25 bg-slate-950 text-white shadow-2xl">
-      <div className="flex h-full flex-col p-6 md:p-8">
+    <div className="aspect-video w-full overflow-hidden rounded-2xl border border-cyan-400/25 bg-[#07101f] text-white shadow-2xl">
+      <div className="relative flex h-full flex-col overflow-hidden p-6 md:p-8" style={{
+        backgroundImage: 'radial-gradient(circle at 18% 18%, rgba(0,245,255,.10), transparent 28%), radial-gradient(circle at 88% 78%, rgba(255,20,147,.12), transparent 30%), linear-gradient(145deg, #111c31 0%, #07101f 55%, #040812 100%)',
+      }}>
+        <div className="pointer-events-none absolute -left-8 top-20 h-24 w-24 rotate-12 rounded-[35%] border border-cyan-300/20 bg-cyan-400/5 shadow-[0_0_55px_rgba(0,245,255,.14)]" />
+        <div className="pointer-events-none absolute -right-7 bottom-5 h-28 w-28 rotate-45 rounded-[32%] border border-fuchsia-300/20 bg-fuchsia-400/5 shadow-[0_0_65px_rgba(255,20,147,.16)]" />
         <div className="flex items-center justify-between text-xs font-bold uppercase tracking-[0.22em] text-slate-400">
-          <span><span className="text-cyan-300">WHAT</span><span className="text-fuchsia-300">EVER!</span></span>
+          <span className="text-lg font-black tracking-[0.08em]"><span className="text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,.8)]">WHAT</span><span className="text-fuchsia-300 drop-shadow-[0_0_8px_rgba(244,114,182,.8)]">EVER!</span></span>
           <span>Room DEMO · {phaseLabels[phase]}</span>
         </div>
-        {phase === 'lobby' && <div className="grid flex-1 place-items-center text-center">
-          <div><div className="mx-auto grid h-36 w-36 place-items-center rounded-xl bg-white text-6xl text-slate-950">▦</div><h2 className="mt-5 text-4xl font-black">Scan to join</h2><p className="mt-2 text-slate-300">Ali, Erika and Tim are ready</p></div>
+        {phase === 'lobby' && <div className="relative z-10 grid min-h-0 flex-1 grid-cols-[0.82fr_1.18fr] items-center gap-5 pt-4 md:gap-8">
+          <div className="flex h-full min-h-0 flex-col items-center justify-center rounded-3xl border border-white/10 bg-black/20 px-5 py-4 text-center shadow-inner">
+            <div className="text-[0.65rem] font-black uppercase tracking-[0.32em] text-amber-300">Join the chaos</div>
+            <div className="mt-2 rounded-2xl bg-white p-2 shadow-[0_0_35px_rgba(0,245,255,.22)]">
+              {demoQr ? <img src={demoQr} alt="Demo room QR code" className="h-24 w-24 md:h-32 md:w-32" /> : <div className="h-24 w-24 md:h-32 md:w-32" />}
+            </div>
+            <div className="mt-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">Scan with your phone</div>
+          </div>
+          <div className="flex min-w-0 flex-col justify-center">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div className="text-[0.65rem] font-black uppercase tracking-[0.3em] text-fuchsia-300">Your game is almost ready</div>
+                <h2 className="mt-1 text-3xl font-black leading-none md:text-5xl">ROOM <span className="text-amber-300 drop-shadow-[0_0_12px_rgba(252,211,77,.35)]">DEMO</span></h2>
+              </div>
+              <div className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-bold text-emerald-200">3 joined</div>
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {players.map((player) => <div key={player.name} className="rounded-2xl border border-white/10 bg-white/[.06] px-2 py-3 text-center shadow-lg">
+                <div className="text-2xl md:text-3xl">{player.avatar}</div>
+                <div className="mt-1 truncate text-sm font-black">{player.name}</div>
+                <div className="mt-1 text-[0.55rem] font-bold uppercase tracking-wider text-emerald-300">● Ready</div>
+              </div>)}
+            </div>
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-cyan-300/15 bg-cyan-300/[.06] px-4 py-3">
+              <div className="min-w-0"><div className="truncate text-sm font-black">Headline Hijack</div><div className="text-[0.65rem] text-slate-400">Everyone opted in</div></div>
+              <div className="shrink-0 rounded-xl border border-fuchsia-300/50 bg-fuchsia-400/15 px-4 py-2 text-xs font-black uppercase tracking-wider text-fuchsia-100 shadow-[0_0_18px_rgba(244,114,182,.16)]">Start game →</div>
+            </div>
+          </div>
         </div>}
         {(phase === 'prompt' || phase === 'answering') && <div className="grid flex-1 place-items-center text-center">
           <div><div className="text-sm font-black uppercase tracking-[0.3em] text-amber-300">Headline Hijack · Round 1 of 6</div><h2 className="mt-6 text-4xl font-black md:text-6xl">Mayor announces plan to <span className="text-cyan-300">____</span> by Friday.</h2><p className="mt-6 text-xl text-slate-300">{phase === 'prompt' ? 'Round Owner: Erika' : '3 of 3 answers received · 42s'}</p></div>
