@@ -51,6 +51,7 @@ export default function Lobby() {
   const [roundResults, setRoundResults] = useState<RoundResults>({ ownerAnswerId: null, correctGuessers: [], voteCounts: {}, ownerSweetSpot: false })
   const [leaderboards, setLeaderboards] = useState<Leaderboards>({ chameleon: {}, crowd: {} })
   const [roundIndex, setRoundIndex] = useState(0)
+  const [totalRounds, setTotalRounds] = useState(6)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string>('')
   const [channel, setChannel] = useState<RealtimeChannel | null>(null)
@@ -122,6 +123,7 @@ export default function Lobby() {
         setRoundResults(parseRoundResults(boardState.currentRound?.results))
         setLeaderboards(parseLeaderboards(boardState.room?.leaderboards))
         setRoundIndex(boardState.room?.round_index || 0)
+        setTotalRounds(boardState.room?.total_rounds || 6)
         if (boardState.currentRound?.id && (boardState.currentRound.phase === 'guessing' || boardState.currentRound.phase === 'results')) {
           setRevealItems(await getRevealItems(boardState.currentRound.id))
         } else {
@@ -260,6 +262,7 @@ export default function Lobby() {
       setRoundResults(parseRoundResults(initialState.currentRound?.results))
       setLeaderboards(parseLeaderboards(initialState.room?.leaderboards))
       setRoundIndex(initialState.room?.round_index || 0)
+      setTotalRounds(initialState.room?.total_rounds || 6)
       if (initialState.currentRound?.id && (initialState.currentRound.phase === 'guessing' || initialState.currentRound.phase === 'results')) {
         setRevealItems(await getRevealItems(initialState.currentRound.id))
       } else {
@@ -475,7 +478,7 @@ export default function Lobby() {
       if (!hostDeviceId || roomId) return
       const { data, error } = await supabase
         .from('rooms')
-        .select('id,status,created_at')
+        .select('id,status,created_at,round_index,total_rounds')
         .eq('host_device_id', hostDeviceId)
         .neq('status', 'ended')
         .order('created_at', { ascending: false })
@@ -484,7 +487,10 @@ export default function Lobby() {
         return
       }
       const now = Date.now()
-      const fresh = (data || []).filter(r => (now - new Date(r.created_at).getTime()) < 30 * 60 * 1000)
+      const fresh = (data || []).filter(r =>
+        (now - new Date(r.created_at).getTime()) < 30 * 60 * 1000 &&
+        r.round_index < r.total_rounds,
+      )
       // Fetch counts for display
       const augmented = await Promise.all(fresh.map(async (r) => {
         const { count } = await supabase
@@ -846,6 +852,11 @@ export default function Lobby() {
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
   const chameleonRanking = rank(leaderboards.chameleon)
   const crowdRanking = rank(leaderboards.crowd)
+  const gameComplete = roundIndex >= totalRounds
+  const chameleonHighScore = chameleonRanking[0]?.score ?? 0
+  const crowdHighScore = crowdRanking[0]?.score ?? 0
+  const chameleonChampions = chameleonRanking.filter((player) => player.score === chameleonHighScore)
+  const crowdChampions = crowdRanking.filter((player) => player.score === crowdHighScore)
 
   return (
     <div className="min-h-screen bg-gray-900 p-8">
@@ -948,7 +959,7 @@ export default function Lobby() {
         ) : roundPhase === 'results' ? (
           <div className="mb-8 overflow-hidden rounded-3xl border border-fuchsia-400/30 bg-slate-950 text-white shadow-2xl">
             <div className="bg-gradient-to-r from-fuchsia-500/20 via-slate-950 to-cyan-500/20 px-8 py-7 text-center">
-              <div className="text-sm font-bold uppercase tracking-[0.3em] text-amber-300">Round {roundIndex} results</div>
+              <div className="text-sm font-bold uppercase tracking-[0.3em] text-amber-300">{gameComplete ? 'Final results' : `Round ${roundIndex} results`}</div>
               <h2 className="mt-3 text-4xl font-black md:text-6xl">{owner?.avatar} {owner?.name || 'The Round Owner'}</h2>
               <p className="mt-2 text-lg text-slate-300">was hiding in plain sight</p>
             </div>
@@ -990,20 +1001,46 @@ export default function Lobby() {
               ))}
             </div>
 
+            {gameComplete && (
+              <div className="mx-6 mb-6 grid gap-4 rounded-2xl border border-amber-300/30 bg-amber-300/5 p-6 text-center md:grid-cols-2">
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.22em] text-cyan-300">Chameleon champion{chameleonChampions.length > 1 ? 's' : ''}</div>
+                  <div className="mt-2 text-2xl font-black">{chameleonChampions.map((player) => `${player.avatar} ${player.name}`).join(' & ')}</div>
+                </div>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.22em] text-fuchsia-300">Crowd favourite{crowdChampions.length > 1 ? 's' : ''}</div>
+                  <div className="mt-2 text-2xl font-black">{crowdChampions.map((player) => `${player.avatar} ${player.name}`).join(' & ')}</div>
+                </div>
+              </div>
+            )}
+
             <div className="border-t border-white/10 p-6 text-center">
-              <button
-                onClick={async () => {
-                  try {
-                    setError('')
-                    await startRound(roomId)
-                  } catch (nextRoundError) {
-                    setError(nextRoundError instanceof Error ? nextRoundError.message : 'Failed to start the next round')
-                  }
-                }}
-                className="rounded-2xl border-2 border-fuchsia-400 bg-fuchsia-500/20 px-8 py-4 text-xl font-black text-white transition hover:bg-fuchsia-500/35 active:scale-95"
-              >
-                Next round →
-              </button>
+              {gameComplete ? (
+                <div>
+                  <div className="text-2xl font-black text-amber-300">Game complete</div>
+                  <p className="mt-2 text-sm text-slate-400">Six rounds finished. Thanks for playing!</p>
+                  <button
+                    onClick={handleLeaveRoom}
+                    className="mt-5 rounded-xl border border-white/20 bg-white/10 px-5 py-3 font-bold text-white hover:bg-white/15"
+                  >
+                    Back to title
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={async () => {
+                    try {
+                      setError('')
+                      await startRound(roomId)
+                    } catch (nextRoundError) {
+                      setError(nextRoundError instanceof Error ? nextRoundError.message : 'Failed to start the next round')
+                    }
+                  }}
+                  className="rounded-2xl border-2 border-fuchsia-400 bg-fuchsia-500/20 px-8 py-4 text-xl font-black text-white transition hover:bg-fuchsia-500/35 active:scale-95"
+                >
+                  Next round →
+                </button>
+              )}
             </div>
           </div>
         ) : (roundStarted || roundDeadline) ? (

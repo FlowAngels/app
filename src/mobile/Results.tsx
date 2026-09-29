@@ -11,6 +11,7 @@ export default function Results({ roomId, playerId }: Props) {
   const [myAnswerVotes, setMyAnswerVotes] = useState<number>(0)
   const [position, setPosition] = useState<{ chameleon: number; crowd: number }>({ chameleon: 0, crowd: 0 })
   const [answers, setAnswers] = useState<{ id: string; text: string }[]>([])
+  const [gameComplete, setGameComplete] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -45,11 +46,12 @@ export default function Results({ roomId, playerId }: Props) {
 
       const { data: room } = await supabase
         .from('rooms')
-        .select('leaderboards')
+        .select('leaderboards, round_index, total_rounds')
         .eq('id', roomId)
         .single()
       const lb = parseLeaderboards(room?.leaderboards)
       setPosition({ chameleon: lb.chameleon[playerId] || 0, crowd: lb.crowd[playerId] || 0 })
+      setGameComplete(Boolean(room && room.round_index >= room.total_rounds))
     }
     load()
   }, [roomId, playerId])
@@ -100,7 +102,9 @@ export default function Results({ roomId, playerId }: Props) {
           <p className="text-center text-sm text-slate-300">
             Your answer earned <span className="font-bold text-white">{myAnswerVotes}</span> {myAnswerVotes === 1 ? 'favourite vote' : 'favourite votes'}.
           </p>
-          <p className="text-center text-xs text-slate-500">Watch the shared screen for the full standings and next round.</p>
+          <p className="text-center text-xs text-slate-500">
+            {gameComplete ? 'Watch the shared screen for the two champions.' : 'Watch the shared screen for the full standings and next round.'}
+          </p>
         </div>
       </div>
     </div>

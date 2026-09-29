@@ -25,7 +25,7 @@ export default function SplashScreen() {
       if (cached) {
         const { data: cachedRoom, error } = await supabase
           .from('rooms')
-          .select('id,status,created_at')
+          .select('id,status,created_at,round_index,total_rounds')
           .eq('id', cached)
           .eq('host_device_id', hostDeviceId)
           .neq('status', 'ended')
@@ -34,7 +34,7 @@ export default function SplashScreen() {
         if (!error && cachedRoom) {
           const now = Date.now()
           const roomAge = now - new Date(cachedRoom.created_at).getTime()
-          if (roomAge < 30 * 60 * 1000) { // Less than 30 minutes old
+          if (roomAge < 30 * 60 * 1000 && cachedRoom.round_index < cachedRoom.total_rounds) { // Less than 30 minutes old and unfinished
             setCanResume(true)
             setLatestRoomId(cached)
             return
@@ -48,14 +48,17 @@ export default function SplashScreen() {
       // Look up recent rooms for this device (not ended, <30m old)
       const { data, error } = await supabase
         .from('rooms')
-        .select('id,status,created_at')
+        .select('id,status,created_at,round_index,total_rounds')
         .eq('host_device_id', hostDeviceId)
         .neq('status', 'ended')
         .order('created_at', { ascending: false })
         .limit(5)
       if (error) return
       const now = Date.now()
-      const fresh = (data || []).filter(r => (now - new Date(r.created_at).getTime()) < 30 * 60 * 1000)
+      const fresh = (data || []).filter(r =>
+        (now - new Date(r.created_at).getTime()) < 30 * 60 * 1000 &&
+        r.round_index < r.total_rounds,
+      )
       if (fresh.length > 0) {
         setCanResume(true)
         setLatestRoomId(fresh[0].id)

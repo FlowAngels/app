@@ -121,6 +121,12 @@ was made responsive and visually checked against the recovered mock-up. This
 slice still needs the exit-condition multi-device playtest before it can be
 called a playable MVP.
 
+The six-round boundary now crowns tied or outright Chameleon and Crowd
+champions and returns the host to the title instead of offering an accidental
+seventh round. A server-side end-game/replay command remains future work; it
+should not be added to the live project before the six-round playtest justifies
+that extra lifecycle.
+
 Then run five observed playtests across different relationship types. Continue
 only if at least three groups voluntarily play another game or ask to use it
 again. Treat one excellent personal game night as success; a company is not the
