@@ -14,6 +14,11 @@ crowd appeal. The longer vision includes private remote rooms, optional
 non-human players, and eventually moderated public matchmaking; do not make the
 current couch validation slice an architectural dead end.
 
+Chameleon scoring rewards a correct owner guess (+2), a decoy that fools
+another eligible player (+1 per fooled player), and an owner recognised by some
+but not all eligible players (+3). Crowd scoring remains separate at +1 per
+favourite vote. Phones omit the player's own answer from both choices.
+
 Keep the round legible from across a room, minimise host babysitting, and never
 reveal a player's category choices or answer ownership before results.
 
@@ -23,7 +28,8 @@ reveal a player's category choices or answer ownership before results.
 - Routes: `/`, `/lobby`, and `/join` (`/host` redirects to `/lobby`).
 - Do not expose or commit `.env.local`.
 - The live Supabase schema is reconciled through the versioned migrations dated
-  2026-09-29. Add and rehearse a new migration before any further schema change.
+  2026-09-29. `20260929050000_round_scoring_and_results.sql` is rehearsed but
+  not live; applying it requires Tim's explicit approval.
 - Recovered 2025 work is preserved in commit `678780b`. Keep later changes
   small and reviewable.
 - Do not deploy, alter the live database, or enable payments without Tim's
@@ -46,8 +52,9 @@ a game. Treat all browser input and room codes as untrusted.
 
 ## Product decisions still open
 
-- Validate the original dual-objective loop before expanding the three category
-  concepts. Do not turn it into a game of personal questions without an explicit
+- Validate the dual-objective loop with one varied prompt deck. Treat the three
+  recovered category names as unverified Claude-era scaffolding, not settled
+  product intent. Do not turn it into personal trivia without an explicit
   product decision and comparative playtest.
 - Decide whether the shared TV is essential or optional after playtesting.
 - The name `Whatever!` is a working title; do not invest further in it before a

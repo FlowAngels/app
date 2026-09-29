@@ -36,6 +36,11 @@ function Phone({ playerIndex, phase, roundNumber }: { playerIndex: number; phase
   const otherPlayer = [0, 1, 2].find((index) => index !== playerIndex && index !== ownerIndex) ?? ownerIndex
   const chosenGuess = playerIndex === ownerIndex ? otherPlayer : (playerIndex + (roundNumber ?? 1)) % 2 === 0 ? ownerIndex : otherPlayer
   const chosenVote = (playerIndex + 1) % players.length
+  const chameleonScores = [(roundNumber ?? 1) * 2 + 2, (roundNumber ?? 1) * 2 + 1, (roundNumber ?? 1) * 2]
+  const crowdScores = [(roundNumber ?? 1), (roundNumber ?? 1) + 1, (roundNumber ?? 1) + 2]
+  const chameleonRank = 1 + chameleonScores.filter((score) => score > chameleonScores[playerIndex]).length
+  const crowdRank = 1 + crowdScores.filter((score) => score > crowdScores[playerIndex]).length
+  const crowdWinner = players[((roundNumber ?? 1) + 1) % players.length]
 
   return (
     <div className="mx-auto min-h-[29rem] w-full max-w-[16rem] overflow-hidden rounded-[2rem] border-[5px] border-slate-800 bg-slate-950 text-white shadow-xl">
@@ -62,29 +67,40 @@ function Phone({ playerIndex, phase, roundNumber }: { playerIndex: number; phase
           <div className="mt-2 text-right text-xs text-slate-500">{answer.length}/100</div>
           <button className="mt-4 w-full rounded-xl bg-fuchsia-500/30 py-3 font-black text-fuchsia-100">Submitted ✓</button>
         </>}
-        {(phase === 'reveal' || phase === 'voting') && <>
-          <div className="text-xs font-black uppercase tracking-widest text-fuchsia-300">Find {owner.name} · choose a favourite</div>
+        {phase === 'reveal' && <>
+          <div className="text-xs font-black uppercase tracking-widest text-fuchsia-300">Answers locked</div>
+          <h3 className="mt-4 text-2xl font-black">Eyes on the TV</h3>
+          <p className="mt-3 text-sm text-slate-300">The answers are being shuffled before voting begins.</p>
+          <div className="mt-10 text-center text-6xl">🎭</div>
+        </>}
+        {phase === 'voting' && <>
+          <div className="grid grid-cols-2 rounded-xl bg-white/5 p-1 text-[0.62rem] font-black">
+            <div className="rounded-lg px-2 py-2 text-center text-emerald-300">1 · OWNER ✓</div>
+            <div className="rounded-lg bg-fuchsia-400 px-2 py-2 text-center text-slate-950">2 · FAVOURITE</div>
+          </div>
+          <h3 className="mt-4 text-xl font-black">Which answer deserves the spotlight?</h3>
+          <p className="mt-1 text-xs text-slate-400">Your own answer is hidden.</p>
           <div className="mt-4 space-y-3">
-            {players.map((answerPlayer, index) => {
-              const own = index === playerIndex
-              return <div key={answerPlayer.name} className={`rounded-xl border p-3 text-sm ${phase === 'voting' && chosenGuess === index ? 'border-cyan-400 bg-cyan-400/10' : 'border-white/10 bg-white/5'}`}>
+            {players.map((answerPlayer, index) => ({ answerPlayer, index })).filter(({ index }) => index !== playerIndex).map(({ answerPlayer, index }) => {
+              return <div key={answerPlayer.name} className={`rounded-xl border p-3 text-sm ${chosenVote === index ? 'border-fuchsia-400 bg-fuchsia-400/10' : 'border-white/10 bg-white/5'}`}>
                 <p>{round.answers[index]}</p>
-                {phase === 'voting' && <div className="mt-3 flex gap-2 text-[0.65rem] font-bold">
-                  <span className={chosenGuess === index ? 'text-cyan-300' : 'text-slate-500'}>{own ? 'YOUR ANSWER' : chosenGuess === index ? 'OWNER? ✓' : 'OWNER?'}</span>
-                  {!own && <span className={chosenVote === index ? 'text-amber-300' : 'text-slate-500'}>{chosenVote === index ? '★ FAVOURITE' : '☆ FAVOURITE'}</span>}
-                </div>}
+                {chosenVote === index && <div className="mt-3 text-[0.65rem] font-black text-fuchsia-300">★ FAVOURITE SELECTED</div>}
               </div>
             })}
           </div>
         </>}
         {phase === 'results' && <>
           <div className="text-xs font-black uppercase tracking-widest text-amber-300">Round {roundNumber} results</div>
-          <h3 className="mt-3 text-2xl font-black">{playerIndex === ownerIndex ? `You were the chameleon. +3` : chosenGuess === ownerIndex ? `You spotted ${owner.name}! +2` : `${owner.name} slipped past you.`}</h3>
-          <div className="mt-6 grid grid-cols-2 gap-3 text-center">
-            <div className="rounded-xl bg-cyan-400/10 p-3"><b className="text-2xl text-cyan-300">{(roundNumber ?? 1) * 2 + (playerIndex === ownerIndex ? 1 : 0)}</b><div className="text-[0.65rem] uppercase">Chameleon total</div></div>
-            <div className="rounded-xl bg-fuchsia-400/10 p-3"><b className="text-2xl text-fuchsia-300">{(roundNumber ?? 1) + (playerIndex === chosenVote ? 1 : 0)}</b><div className="text-[0.65rem] uppercase">Crowd total</div></div>
+          <h3 className="mt-3 text-2xl font-black">{owner.avatar} {owner.name} revealed</h3>
+          <div className="mt-4 grid grid-cols-2 gap-2 text-[0.65rem]">
+            <div className="rounded-xl bg-cyan-400/10 p-3"><b className="text-cyan-300">CHAMELEON</b><div className="mt-1">{owner.avatar} {owner.name} +3</div></div>
+            <div className="rounded-xl bg-fuchsia-400/10 p-3"><b className="text-fuchsia-300">CROWD</b><div className="mt-1">{crowdWinner.avatar} {crowdWinner.name} +2</div></div>
           </div>
-          <p className="mt-6 text-center text-xs text-slate-400">Watch the shared screen for the full story.</p>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+            <div className="rounded-xl border border-cyan-400/20 p-3"><b className="text-2xl text-cyan-300">{chameleonScores[playerIndex]}</b><div className="text-[0.58rem] uppercase">Chameleon · #{chameleonRank}/3</div></div>
+            <div className="rounded-xl border border-fuchsia-400/20 p-3"><b className="text-2xl text-fuchsia-300">{crowdScores[playerIndex]}</b><div className="text-[0.58rem] uppercase">Crowd · #{crowdRank}/3</div></div>
+          </div>
+          <p className="mt-3 text-center text-xs text-slate-400">{chosenGuess === ownerIndex ? `You spotted ${owner.name}.` : `${owner.name} slipped past you.`}</p>
         </>}
         {phase === 'champions' && <>
           <div className="text-xs font-black uppercase tracking-widest text-amber-300">Game complete</div>

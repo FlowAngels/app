@@ -46,7 +46,7 @@ npm test
 npm run test:migrations
 ```
 
-The clean install, build, lint, 12 behavior tests, fresh/populated database
+The clean install, build, lint, 17 behavior tests, fresh/populated database
 migration rehearsals, and a six-round live test pass as of 2026-09-29. `npm
 audit` reports zero known vulnerabilities. The original Supabase project is
 reconciled and secured with anonymous Auth, authenticated commands, safe reads,

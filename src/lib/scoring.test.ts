@@ -57,7 +57,25 @@ describe('scoreRound', () => {
     })
 
     expect(scored.results.ownerSweetSpot).toBe(true)
-    expect(scored.leaderboards.chameleon).toEqual({ alex: 2, owner: 3 })
+    expect(scored.leaderboards.chameleon).toEqual({ alex: 3, owner: 3, casey: 1 })
+    expect(scored.results.roundChameleon).toEqual({ alex: 3, owner: 3, casey: 1 })
+  })
+
+  it('awards +1 when a decoy fools another player', () => {
+    const scored = scoreRound({
+      ownerId: 'owner',
+      playerIds: players,
+      submissions,
+      guesses: [
+        { playerId: 'alex', answerId: 'blair-answer' },
+        { playerId: 'blair', answerId: 'owner-answer' },
+      ],
+      votes: [],
+      leaderboards: emptyLeaderboards,
+    })
+
+    expect(scored.results.roundChameleon).toEqual({ blair: 3, owner: 3 })
+    expect(scored.leaderboards.chameleon).toEqual({ blair: 3, owner: 3 })
   })
 
   it('awards one crowd point per vote to each answer owner', () => {

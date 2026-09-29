@@ -41,6 +41,13 @@ private answers, ownership, deadline enforcement, scoring, and idempotency.
 five isolated anonymous sessions and creates a temporary room that must be
 removed afterwards; it is not a routine CI test.
 
+`20260929050000_round_scoring_and_results.sql` adds the agreed +1 Chameleon
+point for each eligible player fooled by a decoy and stores post-reveal answer
+ownership plus per-round Chameleon/Crowd awards in the round result. This lets
+phones name the round winners and calculate personal standings without
+weakening pre-result answer privacy. It passes the embedded fresh/populated
+rehearsal but has **not** been applied to the live project.
+
 Before sharing a public URL, add CAPTCHA or equivalent abuse protection to both
 Supabase anonymous sign-in and the client. Enabling it only in the dashboard
 would break the current sign-in flow.

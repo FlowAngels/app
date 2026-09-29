@@ -25,6 +25,10 @@ const secureReads = await readFile(
   new URL('../supabase/migrations/20260929040000_secure_reads_and_rls.sql', import.meta.url),
   'utf8',
 )
+const roundScoring = await readFile(
+  new URL('../supabase/migrations/20260929050000_round_scoring_and_results.sql', import.meta.url),
+  'utf8',
+)
 
 async function prepareAuthSchema(db) {
   await db.exec(`
@@ -158,11 +162,15 @@ async function verifyAuthenticatedCommands(db) {
   )
   assert.equal(finalized.rows[0].results.ownerSweetSpot, true)
   assert.deepEqual(finalized.rows[0].results.correctGuessers, [playerIds[1]])
+  assert.equal(finalized.rows[0].results.roundChameleon[playerIds[0]], 3)
+  assert.equal(finalized.rows[0].results.roundChameleon[playerIds[1]], 3)
+  assert.equal(finalized.rows[0].results.roundCrowd[playerIds[2]], 2)
+  assert.equal(finalized.rows[0].results.answerOwners[submissionIds[0]], playerIds[0])
 
   const leaderboard = await db.query(`select leaderboards, round_index from public.rooms where id = $1`, [roomId])
   assert.equal(leaderboard.rows[0].round_index, 1)
   assert.equal(leaderboard.rows[0].leaderboards.chameleon[playerIds[0]], 3)
-  assert.equal(leaderboard.rows[0].leaderboards.chameleon[playerIds[1]], 2)
+  assert.equal(leaderboard.rows[0].leaderboards.chameleon[playerIds[1]], 3)
 
   const finalizedAgain = await db.query(
     `select public.whatever_finalize_round($1) as results`,
@@ -208,6 +216,7 @@ async function verifyFreshInstall() {
   await db.exec(commands)
   await db.exec(commandHardening)
   await db.exec(secureReads)
+  await db.exec(roundScoring)
 
   const tables = await db.query(`
     select table_name
@@ -317,6 +326,7 @@ async function verifyPopulatedPrototypeUpgrade() {
   await db.exec(commands)
   await db.exec(commandHardening)
   await db.exec(secureReads)
+  await db.exec(roundScoring)
 
   const active = await db.query('select count(*)::int as count from public.submissions')
   const archived = await db.query(

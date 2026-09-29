@@ -30,13 +30,19 @@ Private remote rooms are the next plausible extension. Public matchmaking and
 non-human players are later product layers, not requirements for proving the
 core loop.
 
-The original scoring rules are authoritative until playtest evidence supports
-a deliberate change:
+The clarified scoring model rewards both recognition and creativity:
 
 - each correct guesser receives +2 Chameleon points;
+- a decoy author receives +1 Chameleon point whenever another eligible player
+  mistakes that answer for the Round Owner's;
 - the Round Owner receives +3 Chameleon points only when some, but not all,
   eligible guessers identify them; and
 - each favourite vote gives the answer's author +1 Crowd point.
+
+This combines the anonymous bluffing inherited from Balderdash, the
+some-but-not-all recognition target inherited from Dixit, and a separate
+Big-Fat-Quiz-style reward for the answer the room most enjoyed. Keep the
+Chameleon and Crowd standings distinct so neither skill becomes incidental.
 
 ## Recovered state
 
@@ -175,6 +181,18 @@ production preview only when `VITE_ENABLE_PLAYTEST_DEMO=true`. Use it to review
 layout, copy, hierarchy, pacing, and choreography before inviting people; do
 not treat it as evidence of comprehension or enjoyment.
 
+The mobile rehearsal and real controller now omit a player's own answer from
+guessing and favourite choices. Voting is presented as two simple steps—spot
+the Round Owner, then pick a favourite—instead of placing two competing actions
+on every answer card. The post-round phone recap shows the Round Owner, both
+round winners, running point totals, and the player's rank on both leaderboards.
+
+`20260929050000_round_scoring_and_results.sql` prepares the agreed +1 decoy
+award and persists post-reveal answer ownership plus per-round point awards so
+the mobile recap can name its winners without exposing ownership during voting.
+It passes fresh and populated migration rehearsals but is **not live**; applying
+it requires Tim's explicit approval.
+
 Then run five observed playtests across different relationship types. Continue
 only if at least three groups voluntarily play another game or ask to use it
 again. Treat one excellent personal game night as success; a company is not the
@@ -201,7 +219,8 @@ not treat it as a simple lobby-list feature.
 
 - Do not deploy, alter a live database, or enable payments without Tim's
   explicit approval.
-- Do not expand categories before the original dual-objective loop works.
+- Treat the recovered named categories as unverified content scaffolding, not
+  settled product intent. Validate one varied prompt deck before adding modes.
 - Do not pivot to personal questions without an explicit product decision and
   comparative playtest.
 - Realtime distributes persisted state; it must not be the sole source of game

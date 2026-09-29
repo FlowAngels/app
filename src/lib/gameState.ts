@@ -10,6 +10,9 @@ export type RoundResults = {
   correctGuessers: string[]
   voteCounts: Record<string, number>
   ownerSweetSpot: boolean
+  answerOwners: Record<string, string>
+  roundChameleon: Record<string, number>
+  roundCrowd: Record<string, number>
 }
 
 export type RevealItem = { id: string; text: string }
@@ -66,7 +69,15 @@ export function parseLeaderboards(value: Json | null | undefined): Leaderboards 
 
 export function parseRoundResults(value: Json | null | undefined): RoundResults {
   if (!isRecord(value)) {
-    return { ownerAnswerId: null, correctGuessers: [], voteCounts: {}, ownerSweetSpot: false }
+    return {
+      ownerAnswerId: null,
+      correctGuessers: [],
+      voteCounts: {},
+      ownerSweetSpot: false,
+      answerOwners: {},
+      roundChameleon: {},
+      roundCrowd: {},
+    }
   }
   return {
     ownerAnswerId: typeof value.ownerAnswerId === 'string' ? value.ownerAnswerId : null,
@@ -75,7 +86,17 @@ export function parseRoundResults(value: Json | null | undefined): RoundResults 
       : [],
     voteCounts: numberRecord(value.voteCounts),
     ownerSweetSpot: value.ownerSweetSpot === true,
+    answerOwners: isRecord(value.answerOwners)
+      ? Object.fromEntries(Object.entries(value.answerOwners).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+      : {},
+    roundChameleon: numberRecord(value.roundChameleon),
+    roundCrowd: numberRecord(value.roundCrowd),
   }
+}
+
+export function playerRank(scores: Record<string, number>, playerId: string): number {
+  const score = scores[playerId] || 0
+  return 1 + Object.values(scores).filter((candidate) => candidate > score).length
 }
 
 export function parseRoomEvent(value: unknown): RoomEvent {

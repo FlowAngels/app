@@ -48,7 +48,15 @@ export default function Lobby() {
   const [roundPhase, setRoundPhase] = useState<'prompt' | 'responding' | 'guessing' | 'results' | ''>('')
   const [voteDeadline, setVoteDeadline] = useState('')
   const [revealItems, setRevealItems] = useState<RevealItem[]>([])
-  const [roundResults, setRoundResults] = useState<RoundResults>({ ownerAnswerId: null, correctGuessers: [], voteCounts: {}, ownerSweetSpot: false })
+  const [roundResults, setRoundResults] = useState<RoundResults>({
+    ownerAnswerId: null,
+    correctGuessers: [],
+    voteCounts: {},
+    ownerSweetSpot: false,
+    answerOwners: {},
+    roundChameleon: {},
+    roundCrowd: {},
+  })
   const [leaderboards, setLeaderboards] = useState<Leaderboards>({ chameleon: {}, crowd: {} })
   const [roundIndex, setRoundIndex] = useState(0)
   const [totalRounds, setTotalRounds] = useState(6)

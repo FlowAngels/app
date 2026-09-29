@@ -12,9 +12,11 @@ interface GuessVoteProps {
 
 export default function GuessVote({ roomId, playerId, items, voteDeadline }: GuessVoteProps) {
   const [roundId, setRoundId] = useState<string>('')
+  const [ownerId, setOwnerId] = useState<string>('')
   const [guessId, setGuessId] = useState<string | null>(null)
   const [voteId, setVoteId] = useState<string | null>(null)
   const [ownIds, setOwnIds] = useState<Set<string>>(new Set())
+  const [step, setStep] = useState<'guess' | 'favourite'>('guess')
   const [now, setNow] = useState(() => Date.now())
   const [hydrated, setHydrated] = useState(false)
 
@@ -22,13 +24,14 @@ export default function GuessVote({ roomId, playerId, items, voteDeadline }: Gue
     const load = async () => {
       const { data } = await supabase
         .from('rounds')
-        .select('id')
+        .select('id, owner_id')
         .eq('room_id', roomId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single()
       if (data) {
         setRoundId(data.id)
+        setOwnerId(data.owner_id || '')
         const { data: mine } = await supabase
           .from('submissions')
           .select('id')
@@ -52,6 +55,7 @@ export default function GuessVote({ roomId, playerId, items, voteDeadline }: Gue
         ])
         setGuessId(savedGuess?.answer_id || null)
         setVoteId(savedVote?.answer_id || null)
+        setStep(data.owner_id === playerId || savedGuess?.answer_id ? 'favourite' : 'guess')
         setHydrated(true)
       }
     }
@@ -87,48 +91,70 @@ export default function GuessVote({ roomId, playerId, items, voteDeadline }: Gue
   }, [roundId, playerId, guessId, voteId, hydrated])
 
   const secondsLeft = Math.ceil(msLeft / 1000)
+  const eligibleItems = hydrated ? items.filter((item) => !ownIds.has(item.id)) : []
+  const isRoundOwner = ownerId === playerId
+
+  if (!hydrated) {
+    return <div className="min-h-screen bg-slate-950 p-6 text-center text-slate-400">Preparing the anonymous answers…</div>
+  }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
-      <div className="max-w-md mx-auto">
+    <div className="min-h-screen bg-slate-950 p-4 text-white">
+      <div className="mx-auto max-w-md">
         {voteDeadline && (
-          <div className="text-center text-sm text-gray-600 mb-3">Time left: {secondsLeft}s</div>
+          <div className="mb-3 text-center text-sm font-bold text-amber-300">Time left: {secondsLeft}s</div>
         )}
+        <div className="mb-5 grid grid-cols-2 rounded-2xl border border-white/10 bg-white/5 p-1 text-sm font-black">
+          <button
+            disabled={isRoundOwner}
+            onClick={() => setStep('guess')}
+            className={`rounded-xl px-3 py-3 ${step === 'guess' ? 'bg-cyan-400 text-slate-950' : isRoundOwner ? 'text-slate-600' : 'text-slate-400'}`}
+          >
+            1 · Spot the owner {guessId ? '✓' : ''}
+          </button>
+          <button
+            onClick={() => setStep('favourite')}
+            className={`rounded-xl px-3 py-3 ${step === 'favourite' ? 'bg-fuchsia-400 text-slate-950' : 'text-slate-400'}`}
+          >
+            {isRoundOwner ? '1' : '2'} · Pick a favourite {voteId ? '✓' : ''}
+          </button>
+        </div>
+
+        <div className="mb-5 text-center">
+          <div className={`text-xs font-black uppercase tracking-[0.25em] ${step === 'guess' ? 'text-cyan-300' : 'text-fuchsia-300'}`}>
+            {step === 'guess' ? 'Recognition' : 'Crowd vote'}
+          </div>
+          <h1 className="mt-2 text-3xl font-black">
+            {step === 'guess' ? 'Which answer sounds like the Round Owner?' : 'Which answer deserves the spotlight?'}
+          </h1>
+          <p className="mt-2 text-sm text-slate-400">
+            {step === 'guess' ? 'Choose one. Your own answer is hidden.' : 'Choose the answer you enjoyed most. Your own answer is hidden.'}
+          </p>
+        </div>
+
         <div className="space-y-3">
-          {items.map(item => {
-            const isOwn = ownIds.has(item.id)
-            const isVote = voteId === item.id
-            const isGuess = guessId === item.id
-            return (
-              <div key={item.id} className={`w-full p-4 rounded-xl border-2 ${isGuess ? 'border-purple-600 bg-purple-50' : 'border-gray-200 bg-white'}`}>
-                <div className="text-gray-800 mb-3">{item.text}</div>
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                  <button
-                    disabled={isOwn}
-                    onClick={() => selectGuess(item.id)}
-                    className={`px-3 py-1 rounded ${isOwn ? 'bg-gray-200 text-gray-400' : isGuess ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
-                  >
-                    {isGuess ? 'Guessed 👤' : 'Guess 👤'}
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <button
-                      disabled={isOwn}
-                      onClick={() => selectVote(item.id)}
-                      className={`px-3 py-1 rounded ${isOwn ? 'bg-gray-200 text-gray-400' : isVote ? 'bg-yellow-400 text-gray-900' : 'bg-yellow-100 hover:bg-yellow-200'}`}
-                    >
-                      {isVote ? 'Favourite ★' : 'Vote ★'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
+          {eligibleItems.map((item, index) => {
+            const selected = step === 'guess' ? guessId === item.id : voteId === item.id
+            return <button
+              key={item.id}
+              onClick={() => {
+                if (step === 'guess') {
+                  selectGuess(item.id)
+                  setStep('favourite')
+                } else selectVote(item.id)
+              }}
+              className={`w-full rounded-2xl border-2 p-5 text-left transition active:scale-[.99] ${selected ? (step === 'guess' ? 'border-cyan-300 bg-cyan-300/10' : 'border-fuchsia-300 bg-fuchsia-300/10') : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+            >
+              <div className="flex gap-3"><span className="font-black text-slate-500">{index + 1}</span><span className="font-semibold leading-snug">{item.text}</span></div>
+              {selected && <div className={`mt-3 text-xs font-black uppercase tracking-widest ${step === 'guess' ? 'text-cyan-300' : 'text-fuchsia-300'}`}>{step === 'guess' ? 'Owner guess selected ✓' : 'Favourite selected ★'}</div>}
+            </button>
           })}
         </div>
-        <div className="mt-3 text-center text-xs text-gray-500">
-          Choose one favourite
-          {voteId && (<button onClick={clearVote} className="ml-2 underline">Clear</button>)}
-        </div>
-        <p className="text-xs text-gray-500 mt-3 text-center">Choose who sounds like the round owner (👤), then choose your favourite answer (★). You can change both until time's up.</p>
+
+        {step === 'favourite' && voteId && <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
+          <span>Saved—you can change it until time runs out.</span>
+          <button onClick={clearVote} className="font-bold text-fuchsia-300 underline">Clear</button>
+        </div>}
       </div>
     </div>
   )
