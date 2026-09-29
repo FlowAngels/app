@@ -17,8 +17,9 @@ Current recovery state:
    Postgres before tightening constraints and adding recovery-ready columns.
 4. `npm run test:migrations` rehearses a fresh installation and the populated
    prototype upgrade in embedded PostgreSQL and currently passes.
-5. The reconciliation has **not** been applied to the live project. Follow
-   [`RECOVERY_RUNBOOK.md`](RECOVERY_RUNBOOK.md) when approval is given.
+5. Tim explicitly approved the reconciliation, and it was applied and verified
+   on 2026-09-29. The active/archive counts and structural checks matched the
+   rehearsed outcome; see [`RECOVERY_RUNBOOK.md`](RECOVERY_RUNBOOK.md).
 
 After reconciliation, move authoritative transitions and scoring behind
 database functions or Edge Functions, enable anonymous Auth for ephemeral

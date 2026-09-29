@@ -4,7 +4,8 @@ Prepared: 2026-09-29
 Project: `xdetfbvaryghuuoknwvl` (`Whatever!`)
 
 This runbook separates recovery of the existing project from the later security
-architecture. Neither live step below has been performed yet.
+architecture. Live operation 1 was explicitly approved, applied, and verified
+on 2026-09-29. Live operation 2 has not been performed.
 
 ## Evidence already captured
 
@@ -16,19 +17,20 @@ architecture. Neither live step below has been performed yet.
   deterministic active row by the reconciliation
 - Fresh and populated upgrade rehearsals: `npm run test:migrations`
 
-## Approved live operation 1 — schema reconciliation
+## Completed live operation 1 — schema reconciliation
 
-Only after Tim explicitly approves altering the live database:
+Tim explicitly approved this operation. Completion evidence:
 
-1. Re-run `npm run test:migrations` and all normal project checks.
-2. Execute only
+1. `npm run test:migrations` and all normal project checks passed.
+2. Only
    `migrations/20260929010000_reconcile_live_prototype.sql` in the Supabase SQL
-   editor. Do not execute the recovered baseline against the populated project.
-3. Confirm the transaction completed without error.
-4. Confirm the active row counts are 6, 12, 11, 2, 0, and 0 respectively.
-5. Confirm the archive row counts remain 6, 12, 11, 3, 0, and 0.
-6. Confirm the existing publishable key can still read the room table.
-7. Record the live result in `LIVE_AUDIT_2026-09-29.md`.
+   editor was executed; the recovered baseline was not run against the populated
+   project.
+3. The transaction completed without error.
+4. Active row counts are 6, 12, 11, 2, 0, and 0 respectively.
+5. Archive row counts are 6, 12, 11, 3, 0, and 0.
+6. Seven structural checks all returned true.
+7. The existing publishable key reads the reconciled API with HTTP 200.
 
 The SQL runs as one transaction. A failure before `commit` leaves the live
 schema unchanged. The database archive plus the local JSON copy provide two

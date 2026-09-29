@@ -53,14 +53,27 @@ and makes `rounds.deadline` nullable to match the recovered two-stage client.
 The explicit data-aware migration
 `20260929010000_reconcile_live_prototype.sql` now preserves all existing rows in
 an access-restricted `archive` schema, removes the one duplicate from the active
-table, and tightens the active schema. It has passed a populated-prototype
-rehearsal but has not been applied live.
+table, and tightens the active schema. It passed the populated-prototype
+rehearsal and, after Tim's explicit approval, was applied live on 2026-09-29.
 
 ## Access recovery outcome
 
 The local app is reconnected to the original project with a browser-safe key.
 Existing keys were not deliberately revoked or changed. A local JSON safety
 copy of all six tables was captured under the ignored `.local-backups/`
-directory. The next live database step is the reviewed reconciliation described
-in `RECOVERY_RUNBOOK.md`; do not apply the reconstructed baseline migration
-directly to this populated project.
+directory. The reviewed reconciliation described in `RECOVERY_RUNBOOK.md` was
+applied successfully; the reconstructed baseline migration was not run against
+the populated project.
+
+## Reconciliation result
+
+The transaction completed successfully. A direct database verification returned
+the expected active counts of 6 rooms, 12 players, 11 rounds, 2 submissions,
+0 guesses, and 0 votes. The access-restricted archive retains 6 rooms,
+12 players, 11 rounds, all 3 original submissions, 0 guesses, and 0 votes.
+
+Post-migration checks confirmed the host/player identity columns, non-null round
+phase, nullable staged-round deadline, and per-player/per-round uniqueness for
+submissions, guesses, and votes. All seven checks returned true. The configured
+publishable key subsequently read the reconciled REST API with HTTP 200,
+including the new `host_user_id` column.
