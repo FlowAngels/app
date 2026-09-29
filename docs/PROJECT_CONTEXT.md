@@ -14,6 +14,22 @@ creative prompt. Players then separately:
 The intended hook is the tension between sounding recognisably like yourself
 and delighting the room. It is not a personal-trivia game about the Round Owner.
 
+The original product vision has three ways to form a game:
+
+1. **Couch play:** start the shared board on a TV, open a lobby, and let nearby
+   players join from their phones by scanning its QR code.
+2. **Private remote play:** share an invite link or room code so people in
+   different locations can join the same private game.
+3. **Open online play:** discover and join public games, with optional
+   non-human players able to participate or fill empty seats.
+
+These are delivery modes around the same round rules, not separate games. The
+current vertical slice deliberately validates couch play first because its
+shared board creates the clearest ceremony and the lowest moderation burden.
+Private remote rooms are the next plausible extension. Public matchmaking and
+non-human players are later product layers, not requirements for proving the
+core loop.
+
 The original scoring rules are authoritative until playtest evidence supports
 a deliberate change:
 
@@ -97,6 +113,10 @@ room was removed and the original live row counts were restored.
    sign-ins; add it with a matching client flow before sharing a public URL.
 6. The 20 Headline Hijack prompts have not yet been playtested for recognisable
    voice and laughter; the two deferred modes have no release-ready content.
+7. Remote invitations have no dedicated hostless/shared-board experience,
+   communications layer, or remote-play onboarding yet.
+8. Non-human players, public-room discovery, matchmaking, moderation, abuse
+   controls, and persistent public identity are not implemented.
 
 ## Current plan
 
@@ -150,6 +170,19 @@ default outcome.
 If the loop earns further investment, test a host-paid occasion pack or private
 custom room before considering subscriptions. Do not add payments before repeat
 hosting behaviour is demonstrated.
+
+If couch play passes that gate, extend in this order:
+
+1. private remote rooms using the existing link/code model and a board view any
+   participant can open;
+2. clearly labelled non-human fill-in players, run server-side so they obey the
+   same privacy and timing rules as people; and
+3. public room discovery only after identity, reporting, moderation, room
+   visibility, and abuse economics have been designed.
+
+Public matchmaking is the largest scope increase: it changes Whatever! from a
+game used among invited people into a social platform involving strangers. Do
+not treat it as a simple lobby-list feature.
 
 ## Boundaries
 
