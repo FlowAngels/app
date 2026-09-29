@@ -109,6 +109,32 @@ room was removed and the original live row counts were restored.
 - Keep `Whatever!` as a working title until trademark and discoverability have
   been checked for any public release.
 
+## Visual direction
+
+The visual north star is **a premium contemporary TV game show invaded by
+strange handmade creatures**. The surviving splash mock-up supplies the
+material cues—dark woven surfaces, knitted characters, cyan/magenta light and
+mustard accents—but not a licence to reproduce late-1980s game-show graphics or
+craft-store kitsch.
+
+The first visual-system pass was implemented on 2026-09-29 across the real
+splash, TV lobby/round states, mobile join/answer/vote/results surfaces, and the
+`/demo` vertical slice. It introduces code-native felt characters, restrained
+neon wordmarks, paper answer slips, modern editorial type, quieter phone shells
+and material panels. Characters are used as emotional punctuation in the
+lobby, reveal and results; active answering and voting screens stay visually
+quiet. This direction is implemented for evaluation, not yet approved as final
+art.
+
+Guardrails:
+
+- use neon as a focused light source, not a border around every component;
+- keep texture subtle enough that TV copy remains readable across a room;
+- reserve the creatures for reactions, identity and ceremony;
+- keep phones calmer and more task-oriented than the shared TV; and
+- reject pixel fonts, arcade chrome, faux-retro interfaces and gratuitous
+  cuteness even when they fit the nominal party-game theme.
+
 ## Material product and engineering gaps
 
 1. The host screen does not present reveal, ownership, results, leaderboards,

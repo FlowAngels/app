@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase'
 import { parseLeaderboards, parsePrompt, parseRoomEvent, parseRoundResults, parseStringArray } from '../lib/gameState'
 import type { Leaderboards, RevealItem, RoundResults } from '../lib/gameState'
 import CountdownClock from './CountdownClock'
+import { WhateverMark } from './WhateverVisuals'
 
 const COLORS = [
   { name: 'Red', value: '🔴', hex: '#ef4444' },
@@ -857,23 +858,26 @@ export default function Lobby() {
   const crowdChampions = crowdRanking.filter((player) => player.score === crowdHighScore)
 
   return (
-    <div className="min-h-screen bg-gray-900 p-8">
-      <div className="max-w-4xl mx-auto text-center">
-        <h1 className="text-4xl font-bold text-white mb-1">Room: {roomId}</h1>
+    <div className="whatever-stage min-h-screen p-5 text-[#f3efe4] md:p-8">
+      <div className="mx-auto max-w-5xl text-center">
+        <header className="mb-6 flex items-center justify-between border-b border-white/[.07] pb-5 text-left">
+          <WhateverMark compact />
+          <div><div className="eyebrow text-[#777f89]">Room</div><div className="text-3xl font-black tracking-[-.04em] text-[#e8bd45]">{roomId}</div></div>
+        </header>
         {expiresInSec != null && !roundDeadline && (
-          <div className="text-sm text-gray-400 mb-4">
+          <div className="mb-4 text-sm text-[#777f89]">
             Auto-deletes in {Math.floor(expiresInSec / 60)}:{String(expiresInSec % 60).padStart(2, '0')}
           </div>
         )}
         {/* Question view during Submit phase */}
         {(roundStarted || roundDeadline) && roundPhase !== 'guessing' && roundPhase !== 'results' && (
-          <div className="mb-8 bg-gray-800 p-6 rounded-lg text-left">
-            <div className="text-gray-300 text-sm">Category</div>
-            <div className="text-2xl font-bold text-white capitalize">
+          <div className="tv-frame mb-8 rounded-[1.75rem] p-7 text-left">
+            <div className="eyebrow text-[#e8bd45]">Round {roundIndex + 1} of {totalRounds}</div>
+            <div className="mt-2 text-sm font-bold uppercase tracking-[.16em] text-[#747d88]">
               {(currentCategory || previewCategory) ? (currentCategory || previewCategory).replaceAll('_',' ') : '—'}
             </div>
-            <div className="mt-3 text-lg text-gray-100">
-              Prompt: <span className="font-semibold">{currentPrompt || previewPrompt || '—'}</span>
+            <div className="mt-5 text-3xl font-black leading-tight tracking-[-.04em] text-[#f3efe4] md:text-5xl">
+              {currentPrompt || previewPrompt || '—'}
             </div>
             {!roundDeadline ? (
               <div className="mt-4 flex items-center justify-between text-gray-200">
@@ -938,27 +942,27 @@ export default function Lobby() {
 
         {/* Grid area: If in Question view, show only Players with ticks; otherwise show QR + Players */}
         {roundPhase === 'guessing' ? (
-          <div className="mb-8 overflow-hidden rounded-3xl border border-cyan-400/30 bg-slate-950 text-left text-white shadow-2xl">
-            <div className="border-b border-white/10 bg-gradient-to-r from-cyan-500/15 to-fuchsia-500/15 px-8 py-6 text-center">
-              <div className="text-sm font-bold uppercase tracking-[0.3em] text-cyan-300">Round {roundIndex + 1} · The reveal</div>
-              <h2 className="mt-3 text-3xl font-black md:text-5xl">Which answer sounds like {owner?.name || 'the Round Owner'}?</h2>
-              <p className="mt-3 text-slate-300">Players are guessing the owner and choosing the answer they loved most.</p>
+          <div className="tv-frame mb-8 overflow-hidden rounded-[1.75rem] text-left">
+            <div className="border-b border-white/[.07] px-8 py-6 text-center">
+              <div className="eyebrow text-[#35d8e6]">Round {roundIndex + 1} · The reveal</div>
+              <h2 className="mt-3 text-3xl font-black tracking-[-.045em] md:text-5xl">Which answer sounds like {owner?.name || 'the Round Owner'}?</h2>
+              <p className="mt-3 text-[#9da4ae]">Players are guessing the owner and choosing the answer they loved most.</p>
               {voteDeadline && <div className="mt-4 flex justify-center"><CountdownClock deadline={voteDeadline} totalSeconds={20} label="Vote" /></div>}
             </div>
             <div className="grid gap-4 p-6 md:grid-cols-2">
               {revealItems.map((item, index) => (
-                <div key={item.id} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                  <div className="mb-3 text-xs font-black uppercase tracking-[0.25em] text-fuchsia-300">Answer {index + 1}</div>
-                  <p className="text-xl font-semibold leading-snug text-white">{item.text}</p>
+                <div key={item.id} className="paper-slip rounded-2xl p-5">
+                  <div className="mb-3 text-xs font-black uppercase tracking-[0.25em] text-[#b52c72]">Answer {index + 1}</div>
+                  <p className="text-xl font-semibold leading-snug">{item.text}</p>
                 </div>
               ))}
             </div>
           </div>
         ) : roundPhase === 'results' ? (
-          <div className="mb-8 overflow-hidden rounded-3xl border border-fuchsia-400/30 bg-slate-950 text-white shadow-2xl">
-            <div className="bg-gradient-to-r from-fuchsia-500/20 via-slate-950 to-cyan-500/20 px-8 py-7 text-center">
-              <div className="text-sm font-bold uppercase tracking-[0.3em] text-amber-300">{gameComplete ? 'Final results' : `Round ${roundIndex} results`}</div>
-              <h2 className="mt-3 text-4xl font-black md:text-6xl">{owner?.avatar} {owner?.name || 'The Round Owner'}</h2>
+          <div className="tv-frame mb-8 overflow-hidden rounded-[1.75rem]">
+            <div className="border-b border-white/[.07] px-8 py-7 text-center">
+              <div className="eyebrow text-[#e8bd45]">{gameComplete ? 'Final results' : `Round ${roundIndex} results`}</div>
+              <h2 className="mt-3 text-4xl font-black tracking-[-.045em] md:text-6xl">{owner?.avatar} {owner?.name || 'The Round Owner'}</h2>
               <p className="mt-2 text-lg text-slate-300">was hiding in plain sight</p>
             </div>
 
@@ -1064,16 +1068,16 @@ export default function Lobby() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-8 mb-8">
-            <div className="bg-white p-6 rounded-lg">
-              <h2 className="text-xl font-bold mb-4">Scan to Join</h2>
-              {qrCode && (<img src={qrCode} alt="QR Code" className="mx-auto max-w-64" />)}
-              <p className="text-sm text-gray-600 mt-2">Or go to: {window.location.origin}/join?room={roomId}</p>
+            <div className="material-panel rounded-[1.75rem] p-6">
+              <div className="eyebrow mb-4 text-[#e8bd45]">Scan to join</div>
+              {qrCode && (<div className="mx-auto w-fit rounded-[1.4rem] bg-[#f3efe4] p-3"><img src={qrCode} alt="QR Code" className="max-w-56" /></div>)}
+              <p className="mt-3 text-sm text-[#7f8792]">Or open {window.location.origin}/join?room={roomId}</p>
             </div>
-            <div className="bg-gray-800 p-6 rounded-lg">
-              <h2 className="text-xl font-bold text-white mb-4">Players ({players.length}/8)</h2>
+            <div className="material-panel rounded-[1.75rem] p-6 text-left">
+              <div className="eyebrow mb-4 text-[#35d8e6]">Players · {players.length}/8</div>
               <div className="space-y-2">
                 {players.map((player) => (
-                  <div key={player.id} className="flex items-center space-x-3 p-3 bg-gray-700 rounded">
+                  <div key={player.id} className="flex items-center space-x-3 rounded-2xl border border-white/[.06] bg-black/20 p-3">
                     <span className="text-3xl">{player.avatar}</span>
                     <div className="flex-1">
                       <span className="text-white font-medium text-lg capitalize">{player.name}</span>
@@ -1106,7 +1110,7 @@ export default function Lobby() {
                         console.error('Failed to start round', e)
                       }
                     }}
-                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded font-semibold"
+                    className="rounded-full bg-[#f24b9d] px-6 py-3 font-black text-[#170a12] transition hover:bg-[#ff6aae]"
                   >
                     Start
                   </button>

@@ -104,11 +104,11 @@ export default function Results({ roomId, playerId }: Props) {
   }).join(' & ')
 
   return (
-    <div className="min-h-screen bg-slate-950 p-4 text-white">
-      <div className="mx-auto w-full max-w-md overflow-hidden rounded-3xl border border-fuchsia-400/30 bg-slate-900 shadow-2xl">
-        <div className="bg-gradient-to-r from-fuchsia-500/20 to-cyan-500/20 px-6 py-7 text-center">
-          <div className="text-xs font-black uppercase tracking-[0.28em] text-amber-300">Round {roundNumber} complete</div>
-          <h1 className="mt-2 text-3xl font-black">{owner?.avatar} {owner?.name || 'The Round Owner'} revealed</h1>
+    <div className="whatever-stage min-h-screen p-4 text-[#f3efe4]">
+      <div className="phone-shell mx-auto w-full max-w-md overflow-hidden rounded-[2rem] border-[5px]">
+        <div className="border-b border-white/[.07] px-6 py-7 text-center">
+          <div className="eyebrow text-[#e8bd45]">Round {roundNumber} complete</div>
+          <h1 className="mt-2 text-3xl font-black tracking-[-.04em]">{owner?.avatar} {owner?.name || 'The Round Owner'} revealed</h1>
           <p className={`mt-2 font-bold ${correct ? 'text-emerald-300' : 'text-slate-300'}`}>
             {playerId === ownerId ? (results.ownerSweetSpot ? 'Sweet spot! You earned +3.' : 'You were either too hidden or too obvious.') : correct ? 'You recognised them! +2' : 'They slipped past you.'}
           </p>
@@ -118,12 +118,12 @@ export default function Results({ roomId, playerId }: Props) {
           <section>
             <div className="mb-2 text-xs font-black uppercase tracking-[0.22em] text-slate-400">This round</div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4">
+              <div className="material-panel rounded-2xl p-4">
                 <div className="text-xs font-black uppercase tracking-wider text-cyan-300">Chameleon</div>
                 <div className="mt-2 font-bold">{chameleonWinners.ids.length ? nameList(chameleonWinners.ids) : 'No points awarded'}</div>
                 {chameleonWinners.points > 0 && <div className="mt-1 text-xs text-slate-400">+{chameleonWinners.points} this round</div>}
               </div>
-              <div className="rounded-2xl border border-fuchsia-400/20 bg-fuchsia-400/5 p-4">
+              <div className="material-panel rounded-2xl p-4">
                 <div className="text-xs font-black uppercase tracking-wider text-fuchsia-300">Crowd</div>
                 <div className="mt-2 font-bold">{crowdWinners.ids.length ? nameList(crowdWinners.ids) : 'No favourite'}</div>
                 {crowdWinners.points > 0 && <div className="mt-1 text-xs text-slate-400">+{crowdWinners.points} this round</div>}
@@ -131,7 +131,7 @@ export default function Results({ roomId, playerId }: Props) {
             </div>
           </section>
 
-          {mostPopular.length > 0 && <div className="rounded-2xl border border-amber-300/20 bg-amber-300/5 p-5">
+          {mostPopular.length > 0 && <div className="paper-slip rounded-2xl p-5">
             <div className="text-xs font-black uppercase tracking-[0.2em] text-amber-300">Favourite {mostPopular.length > 1 ? 'answers' : 'answer'}</div>
             {mostPopular.map((answer) => <div key={answer.id} className="mt-3">
               <p className="text-lg font-bold">“{answer.text}”</p>

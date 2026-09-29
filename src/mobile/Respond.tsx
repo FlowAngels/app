@@ -79,42 +79,43 @@ export default function Respond({ roomId, playerId }: RespondProps) {
 
   if (!roundId) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="text-center text-gray-700">Waiting for round...</div>
+      <div className="whatever-stage flex min-h-screen items-center justify-center p-4">
+        <div className="eyebrow text-[#8f98a3]">Waiting for the next round…</div>
       </div>
     )
   }
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
+      <div className="whatever-stage flex min-h-screen items-center justify-center p-4 text-[#f3efe4]">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-green-600 mb-4">Answer submitted!</h1>
-          <p className="text-gray-600">Waiting for reveal...</p>
+          <div className="mx-auto mb-5 h-3 w-3 rounded-full bg-[#73d8b0] shadow-[0_0_1.5rem_rgba(115,216,176,.65)]" />
+          <h1 className="mb-4 text-3xl font-black tracking-[-.04em]">Answer submitted</h1>
+          <p className="text-[#8f98a3]">Eyes on the TV. The reveal is next.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="relative min-h-screen bg-slate-950 flex items-center justify-center p-4 text-white">
+    <div className="whatever-stage relative flex min-h-screen items-center justify-center p-4 text-[#f3efe4]">
       <div className="absolute right-4 top-4"><MobileCountdown seconds={secondsLeft} /></div>
-      <div className="w-full max-w-md rounded-3xl border border-cyan-400/20 bg-slate-900 p-6 pt-8 shadow-2xl">
-        <h1 className="text-xl font-semibold mb-2">Submit your answer</h1>
-        {prompt && <p className="mb-4 text-sm text-slate-300">Prompt: <span className="font-medium text-white">{prompt}</span></p>}
+      <div className="material-panel w-full max-w-md rounded-[2rem] p-6 pt-8">
+        <div className="eyebrow text-[#35d8e6]">Your answer</div>
+        {prompt && <h1 className="mb-5 mt-3 text-3xl font-black leading-tight tracking-[-.04em]">{prompt}</h1>}
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={100}
           rows={4}
-          className="mb-2 w-full rounded-xl border border-white/15 bg-slate-950 p-3 text-white"
-          placeholder="Type up to 100 characters"
+          className="paper-slip mb-2 w-full resize-none rounded-2xl border-0 p-4 font-semibold leading-relaxed outline-none ring-[#35d8e6] focus:ring-2"
+          placeholder="Write the line only you would write…"
         />
         <div className="mb-3 text-xs text-slate-500">{text.length}/100</div>
         <button
           onClick={handleSubmit}
           disabled={disabled}
-          className="w-full rounded-xl bg-fuchsia-600 py-3 font-bold text-white hover:bg-fuchsia-500 disabled:bg-slate-700 disabled:text-slate-400"
+          className="w-full rounded-full bg-[#f24b9d] py-3 font-black text-[#170a12] transition hover:bg-[#ff6aae] disabled:bg-[#252b34] disabled:text-[#69717c]"
         >
           {submitting ? 'Submitting...' : 'Submit'}
         </button>

@@ -15,6 +15,7 @@ import GuessVote from './GuessVote'
 import Results from './Results'
 import { subscribeToRoom, unsubscribeFromRoom } from '../lib/orchestrator'
 import { parseRoomEvent, parseStringArray } from '../lib/gameState'
+import { PlayerDot, WhateverMark } from '../components/WhateverVisuals'
 
 const COLORS = [
   { name: 'Red', value: '🔴', hex: '#ef4444' },
@@ -298,11 +299,12 @@ export default function Join() {
       return <Results roomId={roomId!} playerId={playerId} />
     }
     return (
-      <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
+      <div className="whatever-stage flex min-h-screen items-center justify-center p-4 text-[#f3efe4]">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-green-600 mb-4">🎉 Ready to Play!</h1>
-          <p className="text-gray-600 mb-4">You've joined the room and selected your categories.</p>
-          <p className="text-sm text-gray-500 mb-6">Wait for the host to start the game...</p>
+          <div className="mx-auto mb-5 h-3 w-3 rounded-full bg-[#73d8b0] shadow-[0_0_1.5rem_rgba(115,216,176,.65)]" />
+          <h1 className="mb-4 text-3xl font-black tracking-[-.04em]">You’re in</h1>
+          <p className="mb-4 text-[#b3b8c0]">Your place in room {roomId} is saved.</p>
+          <p className="mb-6 text-sm text-[#737b86]">The host will start when everyone is ready.</p>
           <button
             onClick={leaveCurrent}
             className="text-sm text-gray-700 underline hover:text-gray-900"
@@ -315,38 +317,38 @@ export default function Join() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h1 className="text-2xl font-bold text-center mb-6">Join Room: {roomId}</h1>
+    <div className="whatever-stage flex min-h-screen items-center justify-center p-4 text-[#f3efe4]">
+      <div className="material-panel w-full max-w-md rounded-[2rem] p-6">
+        <div className="mb-8 text-center"><WhateverMark compact /><div className="eyebrow mt-5 text-[#e8bd45]">Join room {roomId}</div></div>
         {success === 'left' && leftRoomId && (
-          <div className="mb-4 p-3 rounded bg-yellow-100 text-yellow-800 text-sm text-center">
+          <div className="mb-4 rounded-xl border border-[#e8bd45]/20 bg-[#e8bd45]/10 p-3 text-center text-sm text-[#e8cf80]">
             You left Room {leftRoomId}. You can rejoin below.
           </div>
         )}
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="mb-4 rounded-xl border border-[#f24b9d]/40 bg-[#f24b9d]/10 px-4 py-3 text-[#ff9bc9]">
             {error}
           </div>
         )}
 
         <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            Your Name
+          <label className="eyebrow mb-2 block text-[#8f98a3]">
+            Your name
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+            className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-lg font-semibold outline-none focus:border-[#35d8e6]"
             placeholder="Enter your name"
             maxLength={20}
           />
         </div>
 
         <div className="mb-6">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            Choose Your Color
+          <label className="eyebrow mb-3 block text-[#8f98a3]">
+            Choose your colour
           </label>
           <div className="grid grid-cols-4 gap-2">
             {COLORS.map((color) => {
@@ -358,17 +360,17 @@ export default function Join() {
                   key={color.name}
                   onClick={() => !isTaken && setSelectedColor(color)}
                   disabled={isTaken}
-                  className={`p-3 text-2xl rounded-lg border-4 transition-all ${
+                  className={`grid min-h-20 place-items-center rounded-2xl border transition-all ${
                     isTaken
-                      ? 'border-gray-300 bg-gray-200 opacity-50 cursor-not-allowed'
+                      ? 'cursor-not-allowed border-white/5 bg-white/[.02] opacity-35'
                       : isSelected
-                        ? 'border-gray-800 bg-gray-100 scale-110'
-                        : 'border-gray-200 hover:border-gray-400'
+                        ? 'scale-105 bg-white/10'
+                        : 'border-white/10 bg-white/[.03] hover:bg-white/[.06]'
                   }`}
                   style={{ borderColor: isSelected && !isTaken ? color.hex : undefined }}
                 >
-                  {color.value}
-                  <div className={`text-xs mt-1 ${isTaken ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <PlayerDot color={color.hex} />
+                  <div className={`mt-1 text-[.62rem] font-bold ${isTaken ? 'text-[#555d67]' : 'text-[#9ca3ad]'}`}>
                     {color.name}{isTaken ? ' (taken)' : ''}
                   </div>
                 </button>
@@ -380,7 +382,7 @@ export default function Join() {
         <button
           onClick={handleJoin}
           disabled={isJoining || !name.trim()}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
+          className="w-full rounded-full bg-[#f24b9d] px-4 py-3 font-black text-[#170a12] transition hover:bg-[#ff6aae] disabled:cursor-not-allowed disabled:bg-[#252b34] disabled:text-[#69717c]"
         >
           {isJoining ? 'Joining...' : 'Join Game'}
         </button>
