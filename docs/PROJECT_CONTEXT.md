@@ -162,6 +162,14 @@ idempotent finalisation. The generated room `A9EP` was removed and the original
 live counts were restored. This is strong functional evidence, but it does not
 replace the later human playtest for comprehension, pacing, or fun.
 
+An internal `/demo` dress rehearsal now presents one shared TV and three
+simulated phones through seven deterministic phases: lobby, round-ready,
+answering, reveal, guess/favourite, results, and final champions. It supports
+manual stepping and auto-play, writes no game data, and is included in a
+production preview only when `VITE_ENABLE_PLAYTEST_DEMO=true`. Use it to review
+layout, copy, hierarchy, and choreography before inviting people; do not treat
+it as evidence of comprehension or enjoyment.
+
 Then run five observed playtests across different relationship types. Continue
 only if at least three groups voluntarily play another game or ask to use it
 again. Treat one excellent personal game night as success; a company is not the

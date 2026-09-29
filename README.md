@@ -27,6 +27,13 @@ Routes:
 - `/` — landing screen
 - `/lobby` — shared host screen
 - `/join?room=CODE` — player controller
+- `/demo` — synthetic TV + three-phone dress rehearsal; available during local
+  development, or in a private preview built with
+  `VITE_ENABLE_PLAYTEST_DEMO=true`
+
+The demo uses deterministic fake players and does not write game data. It is a
+visual and choreography check, complementing rather than replacing the separate
+live Supabase test.
 
 ## Checks
 
