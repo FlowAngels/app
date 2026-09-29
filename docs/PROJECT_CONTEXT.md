@@ -73,8 +73,10 @@ room was removed and the original live row counts were restored.
 
 ## Fidelity references
 
-- The nine prompts in `src/lib/prompts.ts` are Claude-generated placeholders,
-  not approved content. They do not constitute the planned 60-prompt library.
+- `src/lib/prompts.ts` now contains a focused 20-prompt Headline Hijack pack,
+  grounded in the two examples from the original specification. It is ready for
+  playtesting, not yet validated content. Law or Nah and Meme Mash remain
+  deferred until the central loop earns further investment.
 - The original splash mock-up remains outside this nested Git repository at
   `../assets/Mock-up Splash screen.png`. The current coded splash is an
   approximation and is not approved as a faithful replacement.
@@ -93,8 +95,8 @@ room was removed and the original live row counts were restored.
 4. The UI claims room expiry, but no cleanup job is versioned.
 5. CAPTCHA or equivalent abuse protection is not configured for anonymous
    sign-ins; add it with a matching client flow before sharing a public URL.
-6. Content is far below plan: nine placeholder prompts and no licensed image
-   set instead of 60 prompts and 12–16 images.
+6. The 20 Headline Hijack prompts have not yet been playtested for recognisable
+   voice and laughter; the two deferred modes have no release-ready content.
 
 ## Current plan
 

@@ -7,17 +7,7 @@ const CATEGORIES = [
   {
     id: 'headline_hijack',
     name: 'Headline Hijack',
-    description: 'Real-ish headlines with a blank to fill'
-  },
-  {
-    id: 'law_or_nah',
-    name: 'Law or Nah',
-    description: 'Absurd law completions'
-  },
-  {
-    id: 'meme_mash',
-    name: 'Meme Mash',
-    description: 'Submit captions for static images'
+    description: 'Complete a suspiciously plausible headline in your own voice.'
   }
 ]
 
@@ -28,7 +18,7 @@ interface CategoryOptInProps {
 }
 
 export default function CategoryOptIn({ playerId, roomId, onComplete }: CategoryOptInProps) {
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['headline_hijack'])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [categoriesLocked, setCategoriesLocked] = useState<number>(0)
 
@@ -45,7 +35,10 @@ export default function CategoryOptIn({ playerId, roomId, onComplete }: Category
         return
       }
 
-      setSelectedCategories(parseStringArray(data?.selected_categories))
+      const existing = parseStringArray(data?.selected_categories).filter(
+        (category) => category === 'headline_hijack',
+      )
+      if (existing.length > 0) setSelectedCategories(existing)
     } catch (error) {
       console.error('Error loading category selections:', error)
     }
@@ -110,10 +103,10 @@ export default function CategoryOptIn({ playerId, roomId, onComplete }: Category
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6">
         <h1 className="text-2xl font-bold text-gray-800 text-center mb-2">
-          Choose Your Categories
+          Ready for Headline Hijack?
         </h1>
         <p className="text-gray-600 text-center mb-6 text-sm">
-          Select the types of prompts you'd like to play. Only categories everyone picks will be used!
+          This focused build starts with one mode: complete the headline so it is funny, but still sounds recognisably like you.
         </p>
 
         <div className="space-y-3">
@@ -155,13 +148,13 @@ export default function CategoryOptIn({ playerId, roomId, onComplete }: Category
         <div className="mt-6 pt-4 border-t border-gray-200">
           <div className="text-center mb-4 space-y-2">
             <p className="text-xs text-gray-500">
-              Selected: <span className="font-semibold">{selectedCategories.length}</span> of {CATEGORIES.length}
+              Mode selected: <span className="font-semibold">Headline Hijack</span>
             </p>
             <p className="text-xs text-blue-600">
-              Shared by all players: <span className="font-bold">{categoriesLocked}</span> categories
+              Players ready with this mode: <span className="font-bold">{categoriesLocked > 0 ? 'everyone' : 'waiting'}</span>
             </p>
             <p className="text-xs text-gray-400">
-              Only shared categories will be used in the game
+              More modes return only after this core loop earns them in playtesting.
             </p>
           </div>
           <button
@@ -169,7 +162,7 @@ export default function CategoryOptIn({ playerId, roomId, onComplete }: Category
             disabled={isSubmitting || selectedCategories.length === 0}
             className="w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {isSubmitting ? 'Saving...' : 'Lock In Choices'}
+            {isSubmitting ? 'Saving...' : "I'm In"}
           </button>
         </div>
       </div>
