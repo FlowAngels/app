@@ -9,6 +9,7 @@ export type RoundResults = {
   ownerAnswerId: string | null
   correctGuessers: string[]
   voteCounts: Record<string, number>
+  ownerSweetSpot: boolean
 }
 
 export type RevealItem = { id: string; text: string }
@@ -65,7 +66,7 @@ export function parseLeaderboards(value: Json | null | undefined): Leaderboards 
 
 export function parseRoundResults(value: Json | null | undefined): RoundResults {
   if (!isRecord(value)) {
-    return { ownerAnswerId: null, correctGuessers: [], voteCounts: {} }
+    return { ownerAnswerId: null, correctGuessers: [], voteCounts: {}, ownerSweetSpot: false }
   }
   return {
     ownerAnswerId: typeof value.ownerAnswerId === 'string' ? value.ownerAnswerId : null,
@@ -73,6 +74,7 @@ export function parseRoundResults(value: Json | null | undefined): RoundResults 
       ? value.correctGuessers.filter((id): id is string => typeof id === 'string')
       : [],
     voteCounts: numberRecord(value.voteCounts),
+    ownerSweetSpot: value.ownerSweetSpot === true,
   }
 }
 

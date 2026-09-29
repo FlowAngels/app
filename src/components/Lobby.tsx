@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createRoom, joinRoom, subscribeToRoom, unsubscribeFromRoom, deriveBoardState, startRound, beginRoundCountdown, revealRound, startVotePhase, finalizeRound } from '../lib/orchestrator'
+import { createRoom, joinRoom, subscribeToRoom, unsubscribeFromRoom, deriveBoardState, getRevealItems, startRound, beginRoundCountdown, revealRound, startVotePhase, finalizeRound } from '../lib/orchestrator'
 import { getPrompt } from '../lib/prompts'
 import { generateQRCode } from '../lib/qr'
 import CategoryOptIn from '../mobile/CategoryOptIn'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { parsePrompt, parseRoomEvent, parseStringArray } from '../lib/gameState'
+import { parseLeaderboards, parsePrompt, parseRoomEvent, parseRoundResults, parseStringArray } from '../lib/gameState'
+import type { Leaderboards, RevealItem, RoundResults } from '../lib/gameState'
 
 const COLORS = [
   { name: 'Red', value: '🔴', hex: '#ef4444' },
@@ -43,6 +44,13 @@ export default function Lobby() {
   const [roundDeadline, setRoundDeadline] = useState<string>('')
   const [currentCategory, setCurrentCategory] = useState<string>('')
   const [currentPrompt, setCurrentPrompt] = useState<string>('')
+  const [currentOwnerId, setCurrentOwnerId] = useState('')
+  const [roundPhase, setRoundPhase] = useState<'prompt' | 'responding' | 'guessing' | 'results' | ''>('')
+  const [voteDeadline, setVoteDeadline] = useState('')
+  const [revealItems, setRevealItems] = useState<RevealItem[]>([])
+  const [roundResults, setRoundResults] = useState<RoundResults>({ ownerAnswerId: null, correctGuessers: [], voteCounts: {}, ownerSweetSpot: false })
+  const [leaderboards, setLeaderboards] = useState<Leaderboards>({ chameleon: {}, crowd: {} })
+  const [roundIndex, setRoundIndex] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string>('')
   const [channel, setChannel] = useState<RealtimeChannel | null>(null)
@@ -108,6 +116,17 @@ export default function Lobby() {
         setRoundDeadline(boardState.currentRound?.deadline || '')
         setCurrentCategory(boardState.currentRound?.category || '')
         setCurrentPrompt(boardState.currentRound ? parsePrompt(boardState.currentRound.prompt) : '')
+        setCurrentOwnerId(boardState.currentRound?.owner_id || '')
+        setRoundPhase(boardState.currentRound?.phase || '')
+        setVoteDeadline(boardState.currentRound?.vote_deadline || '')
+        setRoundResults(parseRoundResults(boardState.currentRound?.results))
+        setLeaderboards(parseLeaderboards(boardState.room?.leaderboards))
+        setRoundIndex(boardState.room?.round_index || 0)
+        if (boardState.currentRound?.id && (boardState.currentRound.phase === 'guessing' || boardState.currentRound.phase === 'results')) {
+          setRevealItems(await getRevealItems(boardState.currentRound.id))
+        } else {
+          setRevealItems([])
+        }
         setCategoriesLocked(boardState.categoriesLocked || 0)
 
         // Set up deadline auto-progression timer
@@ -208,6 +227,19 @@ export default function Lobby() {
             }, ms)
           }
         }
+
+        if (boardState.currentRound?.phase === 'guessing' && boardState.currentRound.vote_deadline) {
+          const ms = Math.max(0, new Date(boardState.currentRound.vote_deadline).getTime() - Date.now())
+          if (autoFlagsRef.current.voteTimer) clearTimeout(autoFlagsRef.current.voteTimer)
+          autoFlagsRef.current.voteTimer = window.setTimeout(async () => {
+            try {
+              await finalizeRound(id)
+            } catch (error) {
+              console.error('Automatic finalization failed', error)
+            }
+            autoFlagsRef.current.voteTimer = null
+          }, ms)
+        }
       })
       setChannel(roomChannel)
 
@@ -222,7 +254,24 @@ export default function Lobby() {
       setRoundDeadline(initialState.currentRound?.deadline || '')
       setCurrentCategory(initialState.currentRound?.category || '')
       setCurrentPrompt(initialState.currentRound ? parsePrompt(initialState.currentRound.prompt) : '')
+      setCurrentOwnerId(initialState.currentRound?.owner_id || '')
+      setRoundPhase(initialState.currentRound?.phase || '')
+      setVoteDeadline(initialState.currentRound?.vote_deadline || '')
+      setRoundResults(parseRoundResults(initialState.currentRound?.results))
+      setLeaderboards(parseLeaderboards(initialState.room?.leaderboards))
+      setRoundIndex(initialState.room?.round_index || 0)
+      if (initialState.currentRound?.id && (initialState.currentRound.phase === 'guessing' || initialState.currentRound.phase === 'results')) {
+        setRevealItems(await getRevealItems(initialState.currentRound.id))
+      } else {
+        setRevealItems([])
+      }
       setCategoriesLocked(initialState.categoriesLocked || 0)
+
+      if (!initialState.currentRound && initialState.categoryPool.length > 0) {
+        const category = initialState.categoryPool[0]
+        setPreviewCategory(category)
+        setPreviewPrompt(getPrompt(category))
+      }
 
       // Set up deadline auto-progression timer
       if (initialState.currentRound?.deadline) {
@@ -266,6 +315,20 @@ export default function Lobby() {
         setRoundStarted(true)
       } else {
         setRoundStarted(false)
+      }
+
+
+      if (initialState.currentRound?.phase === 'guessing' && initialState.currentRound.vote_deadline) {
+        const ms = Math.max(0, new Date(initialState.currentRound.vote_deadline).getTime() - Date.now())
+        if (autoFlagsRef.current.voteTimer) clearTimeout(autoFlagsRef.current.voteTimer)
+        autoFlagsRef.current.voteTimer = window.setTimeout(async () => {
+          try {
+            await finalizeRound(id)
+          } catch (error) {
+            console.error('Automatic finalization failed', error)
+          }
+          autoFlagsRef.current.voteTimer = null
+        }, ms)
       }
     } catch (err) {
       console.error('Error initializing lobby for room:', err)
@@ -381,6 +444,7 @@ export default function Lobby() {
 
   // Cleanup on unmount
   useEffect(() => {
+    const autoFlags = autoFlagsRef.current
     return () => {
       if (channel) {
         unsubscribeFromRoom(channel)
@@ -388,6 +452,10 @@ export default function Lobby() {
       if (deadlineTimerRef.current) {
         clearTimeout(deadlineTimerRef.current)
         deadlineTimerRef.current = null
+      }
+      if (autoFlags.voteTimer) {
+        clearTimeout(autoFlags.voteTimer)
+        autoFlags.voteTimer = null
       }
     }
   }, [channel])
@@ -515,12 +583,12 @@ export default function Lobby() {
             <div className="font-medium mb-2" style={{
               color: '#cbd5e1',
               lineHeight: '1.3',
-              fontSize: '3rem'
+              fontSize: 'clamp(1.75rem, 8vw, 3rem)'
             }}>
               Join your
             </div>
             <div className="mb-2" style={{
-              fontSize: '5rem',
+              fontSize: '2.5rem',
               fontWeight: '900',
               lineHeight: '0.9',
               letterSpacing: '0.02em'
@@ -767,6 +835,18 @@ export default function Lobby() {
     )
   }
 
+  const owner = players.find((player) => player.id === currentOwnerId)
+  const ownerAnswer = revealItems.find((item) => item.id === roundResults.ownerAnswerId)
+  const topVoteCount = Math.max(0, ...Object.values(roundResults.voteCounts))
+  const crowdFavourites = revealItems.filter(
+    (item) => topVoteCount > 0 && roundResults.voteCounts[item.id] === topVoteCount,
+  )
+  const rank = (scores: Record<string, number>) => players
+    .map((player) => ({ ...player, score: scores[player.id] || 0 }))
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+  const chameleonRanking = rank(leaderboards.chameleon)
+  const crowdRanking = rank(leaderboards.crowd)
+
   return (
     <div className="min-h-screen bg-gray-900 p-8">
       <div className="max-w-4xl mx-auto text-center">
@@ -777,7 +857,7 @@ export default function Lobby() {
           </div>
         )}
         {/* Question view during Submit phase */}
-        {(roundStarted || roundDeadline) && (
+        {(roundStarted || roundDeadline) && roundPhase !== 'guessing' && roundPhase !== 'results' && (
           <div className="mb-8 bg-gray-800 p-6 rounded-lg text-left">
             <div className="text-gray-300 text-sm">Category</div>
             <div className="text-2xl font-bold text-white capitalize">
@@ -848,7 +928,85 @@ export default function Lobby() {
         )}
 
         {/* Grid area: If in Question view, show only Players with ticks; otherwise show QR + Players */}
-        {(roundStarted || roundDeadline) ? (
+        {roundPhase === 'guessing' ? (
+          <div className="mb-8 overflow-hidden rounded-3xl border border-cyan-400/30 bg-slate-950 text-left text-white shadow-2xl">
+            <div className="border-b border-white/10 bg-gradient-to-r from-cyan-500/15 to-fuchsia-500/15 px-8 py-6 text-center">
+              <div className="text-sm font-bold uppercase tracking-[0.3em] text-cyan-300">Round {roundIndex + 1} · The reveal</div>
+              <h2 className="mt-3 text-3xl font-black md:text-5xl">Which answer sounds like {owner?.name || 'the Round Owner'}?</h2>
+              <p className="mt-3 text-slate-300">Players are guessing the owner and choosing the answer they loved most.</p>
+              {voteDeadline && <div className="mt-4 text-lg text-amber-300"><RoundCountdown deadline={voteDeadline} /></div>}
+            </div>
+            <div className="grid gap-4 p-6 md:grid-cols-2">
+              {revealItems.map((item, index) => (
+                <div key={item.id} className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                  <div className="mb-3 text-xs font-black uppercase tracking-[0.25em] text-fuchsia-300">Answer {index + 1}</div>
+                  <p className="text-xl font-semibold leading-snug text-white">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : roundPhase === 'results' ? (
+          <div className="mb-8 overflow-hidden rounded-3xl border border-fuchsia-400/30 bg-slate-950 text-white shadow-2xl">
+            <div className="bg-gradient-to-r from-fuchsia-500/20 via-slate-950 to-cyan-500/20 px-8 py-7 text-center">
+              <div className="text-sm font-bold uppercase tracking-[0.3em] text-amber-300">Round {roundIndex} results</div>
+              <h2 className="mt-3 text-4xl font-black md:text-6xl">{owner?.avatar} {owner?.name || 'The Round Owner'}</h2>
+              <p className="mt-2 text-lg text-slate-300">was hiding in plain sight</p>
+            </div>
+
+            <div className="grid gap-5 p-6 lg:grid-cols-2">
+              <div className="rounded-2xl border border-cyan-400/25 bg-cyan-400/5 p-6">
+                <div className="text-xs font-black uppercase tracking-[0.25em] text-cyan-300">The owner's answer</div>
+                <p className="mt-3 text-2xl font-bold leading-snug">“{ownerAnswer?.text || 'Answer unavailable'}”</p>
+                <p className="mt-4 text-sm text-slate-300">
+                  {roundResults.correctGuessers.length} {roundResults.correctGuessers.length === 1 ? 'player saw' : 'players saw'} through the disguise.
+                  {roundResults.ownerSweetSpot ? ` ${owner?.name || 'The owner'} hit the sweet spot and earned 3 Chameleon points.` : ''}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-amber-300/25 bg-amber-300/5 p-6">
+                <div className="text-xs font-black uppercase tracking-[0.25em] text-amber-300">Crowd favourite</div>
+                {crowdFavourites.length > 0 ? crowdFavourites.map((item) => (
+                  <p key={item.id} className="mt-3 text-2xl font-bold leading-snug">“{item.text}”</p>
+                )) : <p className="mt-3 text-xl text-slate-300">No favourite emerged this round.</p>}
+                {topVoteCount > 0 && <p className="mt-4 text-sm text-slate-300">{topVoteCount} {topVoteCount === 1 ? 'vote' : 'votes'}</p>}
+              </div>
+            </div>
+
+            <div className="grid gap-5 px-6 pb-6 md:grid-cols-2">
+              {[{ title: 'Chameleon', accent: 'text-cyan-300', rows: chameleonRanking }, { title: 'Crowd', accent: 'text-fuchsia-300', rows: crowdRanking }].map((board) => (
+                <div key={board.title} className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                  <h3 className={`text-xl font-black uppercase tracking-[0.2em] ${board.accent}`}>{board.title}</h3>
+                  <div className="mt-4 space-y-2">
+                    {board.rows.map((player, index) => (
+                      <div key={player.id} className="flex items-center gap-3 rounded-xl bg-black/20 px-4 py-3">
+                        <span className="w-6 text-sm font-bold text-slate-400">{index + 1}</span>
+                        <span className="text-xl">{player.avatar}</span>
+                        <span className="flex-1 font-semibold">{player.name}</span>
+                        <span className="text-xl font-black">{player.score}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-white/10 p-6 text-center">
+              <button
+                onClick={async () => {
+                  try {
+                    setError('')
+                    await startRound(roomId)
+                  } catch (nextRoundError) {
+                    setError(nextRoundError instanceof Error ? nextRoundError.message : 'Failed to start the next round')
+                  }
+                }}
+                className="rounded-2xl border-2 border-fuchsia-400 bg-fuchsia-500/20 px-8 py-4 text-xl font-black text-white transition hover:bg-fuchsia-500/35 active:scale-95"
+              >
+                Next round →
+              </button>
+            </div>
+          </div>
+        ) : (roundStarted || roundDeadline) ? (
           <div className="grid md:grid-cols-2 gap-8 mb-8">
             <div className="hidden md:block" />
             <div className="bg-gray-800 p-6 rounded-lg">

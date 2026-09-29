@@ -15,6 +15,7 @@ export default function Respond({ roomId, playerId }: RespondProps) {
   const [prompt, setPrompt] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
 
   // Load current round for this room
   useEffect(() => {
@@ -37,15 +38,13 @@ export default function Respond({ roomId, playerId }: RespondProps) {
 
   const msLeft = useMemo(() => {
     if (!deadline) return 0
-    return Math.max(0, new Date(deadline).getTime() - Date.now())
-  }, [deadline])
+    return Math.max(0, new Date(deadline).getTime() - now)
+  }, [deadline, now])
 
   useEffect(() => {
     if (!deadline) return
-    const t = setInterval(() => {
-      // Trigger re-render
-      setDeadline((d) => d)
-    }, 500)
+    setNow(Date.now())
+    const t = setInterval(() => setNow(Date.now()), 500)
     return () => clearInterval(t)
   }, [deadline])
 

@@ -108,6 +108,17 @@ sequence, human-readable results, dual leaderboard, next-round rotation, and
 refresh/rejoin recovery. The exit condition is three real phones plus one host
 completing six rounds without developer intervention.
 
+The first host vertical-slice pass was implemented on 2026-09-29. The shared
+screen now presents anonymous revealed answers, the Round Owner and their
+answer, the Chameleon outcome, the crowd favourite, named dual leaderboards,
+and a next-round handoff. Player results now mirror those outcomes, and the
+answer timer visibly updates. A browser review also found that the Tailwind 4
+build was using legacy CSS directives; switching to the supported import
+restored the intended styling across the lobby and mobile screens. The splash
+was made responsive and visually checked against the recovered mock-up. This
+slice still needs the exit-condition multi-device playtest before it can be
+called a playable MVP.
+
 Then run five observed playtests across different relationship types. Continue
 only if at least three groups voluntarily play another game or ask to use it
 again. Treat one excellent personal game night as success; a company is not the

@@ -73,8 +73,8 @@ export default function SplashScreen() {
       {/* 3D Textured Characters */}
       <div className="absolute" style={{
         top: '8%',
-        left: '12%',
-        fontSize: '8rem',
+        left: '6%',
+        fontSize: 'clamp(4rem, 10vw, 8rem)',
         transform: 'rotate(-15deg)',
         filter: 'drop-shadow(8px 8px 16px rgba(0,0,0,0.7))'
       }}>
@@ -90,8 +90,8 @@ export default function SplashScreen() {
 
       <div className="absolute" style={{
         top: '15%',
-        right: '8%',
-        fontSize: '10rem',
+        right: '4%',
+        fontSize: 'clamp(5rem, 11vw, 10rem)',
         transform: 'rotate(20deg)',
         filter: 'drop-shadow(12px 12px 24px rgba(0,0,0,0.8))'
       }}>
@@ -107,8 +107,8 @@ export default function SplashScreen() {
 
       <div className="absolute" style={{
         bottom: '20%',
-        left: '8%',
-        fontSize: '9rem',
+        left: '3%',
+        fontSize: 'clamp(4.5rem, 10vw, 9rem)',
         transform: 'rotate(-25deg)',
         filter: 'drop-shadow(10px 10px 20px rgba(0,0,0,0.7))'
       }}>
@@ -124,8 +124,8 @@ export default function SplashScreen() {
 
       <div className="absolute" style={{
         bottom: '12%',
-        right: '15%',
-        fontSize: '11rem',
+        right: '5%',
+        fontSize: 'clamp(5rem, 12vw, 11rem)',
         transform: 'rotate(30deg)',
         filter: 'drop-shadow(14px 14px 28px rgba(0,0,0,0.8))'
       }}>
@@ -141,8 +141,8 @@ export default function SplashScreen() {
 
       <div className="absolute" style={{
         top: '45%',
-        left: '5%',
-        fontSize: '7rem',
+        left: '2%',
+        fontSize: 'clamp(3.5rem, 9vw, 7rem)',
         transform: 'rotate(-35deg)',
         filter: 'drop-shadow(6px 6px 12px rgba(0,0,0,0.6))'
       }}>
@@ -157,16 +157,17 @@ export default function SplashScreen() {
       </div>
 
       {/* Main Content */}
-      <div className="text-center relative z-10 px-8" style={{maxWidth: '80rem'}}>
+      <div className="text-center relative z-10 px-5 py-10" style={{width: '100%', maxWidth: '80rem'}}>
 
         {/* WHATEVER! Title */}
         <h1 style={{
-          fontSize: '8.5rem',
+          fontSize: 'clamp(3.2rem, 10vw, 8.5rem)',
           fontWeight: '900',
-          letterSpacing: '0.05em',
-          marginBottom: '2rem',
+          letterSpacing: '0.025em',
+          marginBottom: 'clamp(1.25rem, 4vw, 2rem)',
           lineHeight: '1',
-          position: 'relative'
+          position: 'relative',
+          whiteSpace: 'nowrap'
         }}>
           {/* WHAT - Neon tube style */}
           <span style={{
@@ -231,9 +232,9 @@ export default function SplashScreen() {
 
         {/* Tagline */}
         <p style={{
-          fontSize: '2rem',
+          fontSize: 'clamp(1.05rem, 3vw, 2rem)',
           color: '#fbbf24',
-          marginBottom: '4rem',
+          marginBottom: 'clamp(2rem, 6vw, 4rem)',
           fontWeight: '500',
           textShadow: '0 2px 10px rgba(251, 191, 36, 0.4)'
         }}>
@@ -241,12 +242,12 @@ export default function SplashScreen() {
         </p>
 
         {/* Game Info Badges */}
-        <div className="flex justify-center items-center" style={{gap: '2rem', marginBottom: '4rem'}}>
+        <div className="flex justify-center items-center flex-wrap" style={{gap: 'clamp(1rem, 4vw, 2rem)', marginBottom: 'clamp(2rem, 6vw, 4rem)'}}>
           <div>
             <span style={{
               color: '#fbbf24',
               fontWeight: '600',
-              fontSize: '1.25rem',
+              fontSize: 'clamp(0.95rem, 2.4vw, 1.25rem)',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
@@ -260,7 +261,7 @@ export default function SplashScreen() {
             <span style={{
               color: '#10b981',
               fontWeight: '600',
-              fontSize: '1.25rem',
+              fontSize: 'clamp(0.95rem, 2.4vw, 1.25rem)',
               textShadow: '0 0 10px #10b981, 0 0 20px #10b981'
             }}>
               3–8 players
@@ -271,7 +272,7 @@ export default function SplashScreen() {
             <span style={{
               color: '#3b82f6',
               fontWeight: '600',
-              fontSize: '1.25rem',
+              fontSize: 'clamp(0.95rem, 2.4vw, 1.25rem)',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
@@ -285,7 +286,7 @@ export default function SplashScreen() {
         {/* Description */}
         <div style={{
           color: '#cbd5e1',
-          fontSize: '1.5rem',
+          fontSize: 'clamp(1rem, 2.8vw, 1.5rem)',
           lineHeight: '1.6',
           maxWidth: '42rem',
           margin: '0 auto',
@@ -298,7 +299,7 @@ export default function SplashScreen() {
         </div>
 
         {/* Primary Actions */}
-        <div className="flex items-center justify-center" style={{marginTop: '2.5rem', gap: '3rem'}}>
+        <div className="flex items-center justify-center flex-wrap" style={{marginTop: '2.5rem', gap: '1rem'}}>
           <button
             onClick={async () => {
               // Ensure device id
