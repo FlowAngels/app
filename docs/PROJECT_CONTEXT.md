@@ -24,10 +24,10 @@ a deliberate change:
 
 ## Recovered state
 
-The codebase is an interactive prototype, not a playable MVP. It contains room
-creation and joining, QR links, private category selection, round creation,
-answer entry, anonymous reveal data, a combined guess/favourite controller,
-preliminary results, and JSON leaderboards.
+The codebase is a secured interactive prototype, not yet a playable MVP. It
+contains room creation and joining, QR links, private category selection, round
+creation, answer entry, anonymous reveal data, a combined guess/favourite
+controller, preliminary results, and JSON leaderboards.
 
 Baseline cleanup completed locally on 2026-09-29:
 
@@ -53,23 +53,23 @@ transactional commands for room creation/joining, category choices, round
 start, answering, reveal, guessing, voting, and idempotent final scoring. Its
 rehearsal completes a three-player round and verifies the original scoring
 rules. The live verification found all 11 functions, both ownership indexes,
-and the intended execution grants. It does not enable RLS or change the
-recovered client yet.
+and the intended execution grants.
 
-The client now has an authenticated-command cutover path behind
-`VITE_USE_AUTHENTICATED_COMMANDS`. The switch defaults to false until anonymous
-Auth and read policies are ready, so the existing app remains usable during the
-transition. The secure path covers all material game writes; a follow-up
+The client uses the authenticated-command path through
+`VITE_USE_AUTHENTICATED_COMMANDS=true` in the ignored local environment. The
+secure path covers all material game writes; a follow-up
 migration preserves the controller's ability to clear a favourite vote and
 keeps category consensus correct as players disconnect. That hardening was
 applied and verified live on 2026-09-29.
 
-The coordinated read-security migration is prepared locally in
-`20260929040000_secure_reads_and_rls.sql`. It adds join-safe room previews,
-submission progress without answer leakage, refreshable anonymous reveal items,
-member-scoped reads, and RLS policies that deny direct writes. The migration
-rehearsal verifies that members see only permitted rows, outsiders cannot read
-rooms or revealed answers, and direct inserts are rejected. It is not live.
+The coordinated read-security migration
+`20260929040000_secure_reads_and_rls.sql` is live. Anonymous Auth is enabled;
+join-safe room previews, answer-free submission progress, refreshable reveal
+items, member-scoped reads, and write-denying RLS policies now protect the live
+project. A five-session live test completed a full three-player round and
+verified private answers, outsider isolation, ownership checks, vote clearing,
+deadline enforcement, original scoring, and idempotent finalisation. Its test
+room was removed and the original live row counts were restored.
 
 ## Fidelity references
 
@@ -85,15 +85,15 @@ rooms or revealed answers, and direct inserts are rejected. It is not live.
 
 1. The host screen does not present reveal, ownership, results, leaderboards,
    next-round rotation, game end, and replay as one coherent sequence.
-2. Browser timers currently advance the game. A sleeping or disconnected host
-   can stall or desynchronise play.
-3. Phase changes and final scoring are not authoritative, transactional, or
-   idempotent on the server.
-4. The recovered direct browser writes have no production-safe RLS or trusted
-   command boundary. A room code is not authorisation.
-5. Refresh/rejoin does not fully reconstruct reveal and vote state.
-6. The UI claims room expiry, but no cleanup job is versioned.
-7. Content is far below plan: nine placeholder prompts and no licensed image
+2. Although deadlines, transitions, and scoring are persisted and
+   transactional, a sleeping or disconnected host can still stall automatic
+   phase progression.
+3. Refresh/rejoin does not yet reconstruct every screen and local interaction
+   state cleanly.
+4. The UI claims room expiry, but no cleanup job is versioned.
+5. CAPTCHA or equivalent abuse protection is not configured for anonymous
+   sign-ins; add it with a matching client flow before sharing a public URL.
+6. Content is far below plan: nine placeholder prompts and no licensed image
    set instead of 60 prompts and 12–16 images.
 
 ## Current plan
@@ -102,11 +102,11 @@ Build one faithful vertical slice before broadening the game:
 
 `lobby → prompt → answer → reveal → guess → favourite → results → next round`
 
-Use Headline Hijack first. Move transitions and scoring behind a Postgres
-function or Supabase Edge Function, persist phase/deadlines, finish the shared
-host sequence and dual leaderboard, and test recovery and idempotency. The exit
-condition is three real phones plus one host completing six rounds without
-developer intervention.
+Use Headline Hijack first. The authoritative command boundary, persisted
+deadlines, and idempotent scoring are now in place; finish the shared host
+sequence, human-readable results, dual leaderboard, next-round rotation, and
+refresh/rejoin recovery. The exit condition is three real phones plus one host
+completing six rounds without developer intervention.
 
 Then run five observed playtests across different relationship types. Continue
 only if at least three groups voluntarily play another game or ask to use it

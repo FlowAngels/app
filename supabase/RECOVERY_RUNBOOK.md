@@ -4,8 +4,8 @@ Prepared: 2026-09-29
 Project: `xdetfbvaryghuuoknwvl` (`Whatever!`)
 
 This runbook separates recovery of the existing project from the later security
-architecture. Live operation 1 was explicitly approved, applied, and verified
-on 2026-09-29. Live operation 2 has not been performed.
+architecture. Both live operations were explicitly approved, applied, and
+verified on 2026-09-29.
 
 ## Evidence already captured
 
@@ -36,30 +36,31 @@ The SQL runs as one transaction. A failure before `commit` leaves the live
 schema unchanged. The database archive plus the local JSON copy provide two
 independent recovery sources after a successful commit.
 
-## Approved live operation 2 — anonymous identity
+## Completed live operation 2 — anonymous identity and RLS
 
-Do not enable anonymous sign-ins merely to make the current direct-write client
-work. The authenticated command functions in
-`20260929020000_authenticated_commands.sql` are implemented, rehearsed, and now
-deployed with explicit approval. The client migration and RLS policies are not
-yet live. The material write-path cutover is implemented behind the disabled
-`VITE_USE_AUTHENTICATED_COMMANDS` switch. The read boundary and RLS policies are
-implemented and rehearsed locally in
-`20260929040000_secure_reads_and_rls.sql`. After Tim explicitly approves the
-coordinated live cutover:
+The command functions, client switch, anonymous identity, safe read functions,
+and RLS policies were deployed as one coordinated cutover. Completion evidence:
 
-1. Enable anonymous sign-ins in Supabase Auth.
-2. Verify a new browser session receives an anonymous user ID.
-3. Verify RLS allows that user to join one room and act only as their player.
-4. Verify a player cannot impersonate the host, read private in-progress
-   answers, vote as another player, or mutate final scores.
-5. Enable `VITE_USE_AUTHENTICATED_COMMANDS` for the tested client environment.
+1. Anonymous sign-in produced distinct ephemeral user IDs for five sessions.
+2. `20260929040000_secure_reads_and_rls.sql` applied successfully and RLS is
+   enabled on all six public game tables.
+3. Three players joined a host's room and completed a round entirely through
+   authenticated commands and safe reads.
+4. Members saw only permitted rows; the host could not read private in-progress
+   answers; an outsider could not read the room or revealed answers; and a
+   direct player update was rejected.
+5. Deadline enforcement, vote clearing, original scoring, and repeat-safe
+   finalisation all passed.
+6. `VITE_USE_AUTHENTICATED_COMMANDS=true` is set in the tested local
+   environment.
+7. The temporary test room and its dependent rows were removed, restoring the
+   original active row counts.
 
-Anonymous Auth provides identity, not authority. The command functions and RLS
-policies remain mandatory before any public URL is shared.
+Anonymous Auth provides identity, not authority. The deployed command functions
+and RLS policies provide the authority boundary.
 
-## Recovery boundary
+## Remaining public-release boundary
 
-The live reconciliation deliberately did not enable RLS. RLS belongs to the
-coordinated Auth and feature-switch cutover above; applying it independently
-would break the currently active fallback path.
+Do not share a public URL until anonymous-sign-in abuse protection is designed
+and tested end to end. Supabase recommends CAPTCHA; its dashboard setting and
+the corresponding client token flow must be introduced together.

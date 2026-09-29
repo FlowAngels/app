@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:migrations": "node scripts/verify-migrations.mjs",
+    "test:live-secure": "node scripts/verify-live-secure.mjs",
     "test:watch": "vitest",
     "preview": "vite preview"
   },

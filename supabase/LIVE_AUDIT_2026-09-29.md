@@ -13,8 +13,9 @@ client access. No secret key, schema, data, or project setting was changed.
 - Primary database is running on the Free-plan NANO instance.
 - Data API is installed and enabled.
 - Dashboard reports no migration history and no scheduled backups.
-- All six public tables have RLS disabled and are reported as critical security
-  findings.
+- At initial inspection, all six public tables had RLS disabled and were
+  reported as critical security findings. The approved secure cutover later
+  enabled RLS on all six.
 - The existing legacy anon and two earlier publishable keys returned HTTP 401
   `Invalid API key` from the Data API. A newly created publishable key returns
   HTTP 200 and is now used by the ignored local environment file.
@@ -84,11 +85,29 @@ After a local end-to-end rehearsal and Tim's explicit approval,
 `20260929020000_authenticated_commands.sql` was applied live. Verification
 confirmed 11 `whatever_*` command functions, both player ownership indexes, and
 the intended grants: `authenticated` can execute the commands, while `anon` and
-`public` cannot execute them. Anonymous sign-in and RLS remain disabled, so the
-current recovered client behavior is unchanged. A post-deployment REST read
-returned HTTP 200.
+`public` cannot execute them. At this stage anonymous sign-in and RLS remained
+disabled, so the recovered client behavior was unchanged. A post-deployment
+REST read returned HTTP 200.
 
 The follow-up `20260929030000_command_hardening.sql` was subsequently applied.
 Catalog verification confirmed that favourite votes can be cleared, connection
 changes recompute the category pool, and both authenticated execution grants
-remain present. Auth and RLS were not changed.
+remain present.
+
+## Coordinated Auth and RLS cutover
+
+With Tim's explicit approval, anonymous Auth was enabled and
+`20260929040000_secure_reads_and_rls.sql` was applied on 2026-09-29. The local
+client was switched to the authenticated command path. A live test used five
+independent anonymous sessions (host, three players, and an outsider) and
+verified the complete round flow, private in-progress answers, outsider
+isolation, direct-write rejection, vote clearing, early-finalisation rejection,
+the +2/+3 scoring rules, and idempotent finalisation.
+
+The generated test room `WKEJ` and all of its dependent rows were then deleted.
+The active counts returned to 6 rooms, 12 players, 11 rounds, 2 submissions,
+0 guesses, and 0 votes; the archive remains unchanged.
+
+The Supabase dashboard recommends CAPTCHA for anonymous sign-ins. It remains a
+pre-public-launch task because enabling it without implementing the matching
+client token flow would stop the game from signing players in.
