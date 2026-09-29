@@ -190,11 +190,14 @@ Timed phases now use a prominent circular countdown on the shared TV and a
 compact top-corner countdown on phones. Both turn urgent in the final ten
 seconds, keeping the deadline legible without competing with the phone task.
 
-`20260929050000_round_scoring_and_results.sql` prepares the agreed +1 decoy
-award and persists post-reveal answer ownership plus per-round point awards so
-the mobile recap can name its winners without exposing ownership during voting.
-It passes fresh and populated migration rehearsals but is **not live**; applying
-it requires Tim's explicit approval.
+`20260929050000_round_scoring_and_results.sql` is live. It adds the agreed +1
+decoy award and persists post-reveal answer ownership plus per-round point
+awards so the mobile recap can name its winners without exposing ownership
+during voting. Tim explicitly approved the deployment on 2026-09-29. A new
+six-round live rehearsal then verified decoy and Crowd scoring, post-reveal
+ownership, privacy, refresh/reconnect recovery, and repeat-safe finalisation.
+The three temporary rooms created while applying and verifying the migration
+were removed, and a follow-up query confirmed no `live-verify-` rooms remain.
 
 Then run five observed playtests across different relationship types. Continue
 only if at least three groups voluntarily play another game or ask to use it

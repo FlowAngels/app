@@ -59,6 +59,20 @@ and RLS policies were deployed as one coordinated cutover. Completion evidence:
 Anonymous Auth provides identity, not authority. The deployed command functions
 and RLS policies provide the authority boundary.
 
+## Completed live operation 3 — creative scoring and result detail
+
+Tim explicitly approved `20260929050000_round_scoring_and_results.sql` for the
+live project on 2026-09-29. Completion evidence:
+
+1. The deployed function definition contains the post-reveal `answerOwners`
+   result and decoy-scoring branch.
+2. Execute remains granted to `authenticated` and denied to `anon`.
+3. A six-round live rehearsal verified rotating owners, +1 decoy awards,
+   per-round Crowd awards, private answers, outsider isolation, refresh and
+   reconnect recovery, deadline enforcement, and repeat-safe finalisation.
+4. The completed rehearsal and two diagnostic rehearsal rooms were deleted in
+   dependency order. A follow-up query returned zero `live-verify-` rooms.
+
 ## Remaining public-release boundary
 
 Do not share a public URL until anonymous-sign-in abuse protection is designed

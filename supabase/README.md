@@ -46,7 +46,9 @@ point for each eligible player fooled by a decoy and stores post-reveal answer
 ownership plus per-round Chameleon/Crowd awards in the round result. This lets
 phones name the round winners and calculate personal standings without
 weakening pre-result answer privacy. It passes the embedded fresh/populated
-rehearsal but has **not** been applied to the live project.
+rehearsal and was applied to the live project on 2026-09-29. A six-round live
+rehearsal verified the new result shape and both scoring tracks; all temporary
+rooms and their dependent test data were then removed.
 
 Before sharing a public URL, add CAPTCHA or equivalent abuse protection to both
 Supabase anonymous sign-in and the client. Enabling it only in the dashboard

@@ -58,6 +58,7 @@ const roomId = await rpc(host, 'whatever_create_room', {
   p_host_device_id: `live-verify-${crypto.randomUUID()}`,
 })
 assert.match(roomId, /^[A-Z2-9]{4}$/)
+console.log(`Temporary live verification room: ${roomId}`)
 
 const outsiderPreview = await rpc(outsider, 'whatever_room_preview', { p_room_id: roomId })
 assert.equal(outsiderPreview.playerCount, 0)
@@ -186,6 +187,14 @@ for (let roundNumber = 1; roundNumber <= 6; roundNumber += 1) {
   const results = await rpc(host, 'whatever_finalize_round', { p_round_id: roundId })
   assert.equal(results.ownerSweetSpot, true)
   assert.deepEqual(results.correctGuessers, [playerIds[eligible[0]]])
+  assert.equal(Object.keys(results.answerOwners).length, players.length)
+  for (let index = 0; index < players.length; index += 1) {
+    assert.equal(results.answerOwners[submissionIds[index]], playerIds[index])
+    assert.equal(results.roundCrowd[playerIds[index]], 1)
+  }
+  assert.equal(results.roundChameleon[round.owner_id], 3)
+  assert.equal(results.roundChameleon[playerIds[eligible[0]]], 3)
+  assert.equal(results.roundChameleon[playerIds[eligible[1]]], undefined)
   const resultsAgain = await rpc(host, 'whatever_finalize_round', { p_round_id: roundId })
   assert.deepEqual(resultsAgain, results)
 
@@ -229,4 +238,7 @@ console.log(JSON.stringify({
   playerRefreshRecovered: true,
   hostRefreshRecovered: true,
   disconnectReconnectRecovered: true,
+  postRevealOwnershipVerified: true,
+  decoyScoringVerified: true,
+  perRoundCrowdScoringVerified: true,
 }, null, 2))
