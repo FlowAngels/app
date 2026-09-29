@@ -26,6 +26,11 @@ database functions or Edge Functions, enable anonymous Auth for ephemeral
 players, and apply RLS before a public deployment. The current direct browser
 writes must not be treated as production-safe.
 
+`20260929020000_authenticated_commands.sql` is the prepared first part of that
+work. It adds authenticated, transactional commands and passes an end-to-end
+database rehearsal, but has not been applied live. It intentionally leaves RLS
+disabled until the client reads and writes exclusively through safe interfaces.
+
 The migration makes `rounds.deadline` nullable because the current host flow
 creates a round and begins its countdown as two separate actions. It also adds
 `rounds.created_at`, which the recovered client uses to identify the latest

@@ -13,6 +13,10 @@ const reconciliation = await readFile(
   new URL('../supabase/migrations/20260929010000_reconcile_live_prototype.sql', import.meta.url),
   'utf8',
 )
+const commands = await readFile(
+  new URL('../supabase/migrations/20260929020000_authenticated_commands.sql', import.meta.url),
+  'utf8',
+)
 
 async function prepareAuthSchema(db) {
   await db.exec(`
@@ -20,7 +24,127 @@ async function prepareAuthSchema(db) {
     create role authenticated nologin;
     create schema auth;
     create table auth.users (id uuid primary key default gen_random_uuid());
+    create function auth.uid() returns uuid language sql stable as $$
+      select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+    $$;
   `)
+}
+
+async function setAuthUser(db, userId = '') {
+  await db.query(`select set_config('request.jwt.claim.sub', $1, false)`, [userId])
+}
+
+async function verifyAuthenticatedCommands(db) {
+  const hostUserId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  const playerUserIds = [
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+  ]
+  await db.exec(`
+    insert into auth.users (id) values
+      ('${hostUserId}'),
+      ('${playerUserIds[0]}'),
+      ('${playerUserIds[1]}'),
+      ('${playerUserIds[2]}');
+  `)
+
+  await setAuthUser(db)
+  await assert.rejects(
+    db.query(`select public.whatever_create_room('device-123456')`),
+    /Authentication required/,
+  )
+
+  await setAuthUser(db, hostUserId)
+  const created = await db.query(`select public.whatever_create_room('device-123456') as id`)
+  const roomId = created.rows[0].id
+  assert.match(roomId, /^[A-Z2-9]{4}$/)
+
+  const playerIds = []
+  const names = ['Alex', 'Blair', 'Casey']
+  const avatars = ['🔴', '🔵', '🟢']
+  for (let index = 0; index < playerUserIds.length; index += 1) {
+    await setAuthUser(db, playerUserIds[index])
+    const joined = await db.query(
+      `select public.whatever_join_room($1, $2, $3) as id`,
+      [roomId, names[index], avatars[index]],
+    )
+    playerIds.push(joined.rows[0].id)
+    if (index === 0) {
+      await assert.rejects(
+        db.query(
+          `select public.whatever_set_categories($1, $2::text[])`,
+          [playerIds[index], ['headline_hijack', 'headline_hijack']],
+        ),
+        /Invalid category selection/,
+      )
+    }
+    const categories = await db.query(
+      `select public.whatever_set_categories($1, $2::text[]) as pool`,
+      [playerIds[index], ['headline_hijack']],
+    )
+    assert.deepEqual(categories.rows[0].pool, ['headline_hijack'])
+  }
+
+  await setAuthUser(db, hostUserId)
+  const started = await db.query(
+    `select public.whatever_start_round($1, 'headline_hijack', 'Test ___ headline') as id`,
+    [roomId],
+  )
+  const roundId = started.rows[0].id
+  await db.query(`select public.whatever_begin_round($1)`, [roundId])
+
+  const submissionIds = []
+  for (let index = 0; index < playerUserIds.length; index += 1) {
+    await setAuthUser(db, playerUserIds[index])
+    const submitted = await db.query(
+      `select public.whatever_submit_answer($1, $2) as id`,
+      [roundId, `Answer ${index + 1}`],
+    )
+    submissionIds.push(submitted.rows[0].id)
+  }
+
+  await setAuthUser(db, hostUserId)
+  const revealed = await db.query(`select public.whatever_reveal_round($1) as items`, [roundId])
+  assert.equal(revealed.rows[0].items.length, 3)
+
+  await setAuthUser(db, playerUserIds[0])
+  await assert.rejects(
+    db.query(`select public.whatever_set_guess($1, $2)`, [roundId, submissionIds[0]]),
+    /Cannot guess your own answer/,
+  )
+  await db.query(`select public.whatever_set_guess($1, $2)`, [roundId, submissionIds[1]])
+  await db.query(`select public.whatever_set_vote($1, $2)`, [roundId, submissionIds[2]])
+
+  await setAuthUser(db, playerUserIds[1])
+  await db.query(`select public.whatever_set_guess($1, $2)`, [roundId, submissionIds[0]])
+  await db.query(`select public.whatever_set_vote($1, $2)`, [roundId, submissionIds[2]])
+
+  await setAuthUser(db, playerUserIds[2])
+  await db.query(`select public.whatever_set_guess($1, $2)`, [roundId, submissionIds[1]])
+  await db.query(`select public.whatever_set_vote($1, $2)`, [roundId, submissionIds[1]])
+
+  await db.query(`update public.rounds set vote_deadline = now() - interval '1 second' where id = $1`, [roundId])
+  await setAuthUser(db, hostUserId)
+  const finalized = await db.query(
+    `select public.whatever_finalize_round($1) as results`,
+    [roundId],
+  )
+  assert.equal(finalized.rows[0].results.ownerSweetSpot, true)
+  assert.deepEqual(finalized.rows[0].results.correctGuessers, [playerIds[1]])
+
+  const leaderboard = await db.query(`select leaderboards, round_index from public.rooms where id = $1`, [roomId])
+  assert.equal(leaderboard.rows[0].round_index, 1)
+  assert.equal(leaderboard.rows[0].leaderboards.chameleon[playerIds[0]], 3)
+  assert.equal(leaderboard.rows[0].leaderboards.chameleon[playerIds[1]], 2)
+
+  const finalizedAgain = await db.query(
+    `select public.whatever_finalize_round($1) as results`,
+    [roundId],
+  )
+  assert.deepEqual(finalizedAgain.rows[0].results, finalized.rows[0].results)
+  const unchanged = await db.query(`select round_index from public.rooms where id = $1`, [roomId])
+  assert.equal(unchanged.rows[0].round_index, 1)
 }
 
 async function verifyFreshInstall() {
@@ -29,6 +153,7 @@ async function verifyFreshInstall() {
   await prepareAuthSchema(db)
   await db.exec(baseline)
   await db.exec(reconciliation)
+  await db.exec(commands)
 
   const tables = await db.query(`
     select table_name
@@ -47,6 +172,7 @@ async function verifyFreshInstall() {
     where table_schema = 'public' and table_name = 'rounds' and column_name = 'phase'
   `)
   assert.equal(phaseColumn.rows[0]?.is_nullable, 'NO')
+  await verifyAuthenticatedCommands(db)
   await db.close()
 }
 
@@ -134,6 +260,7 @@ async function verifyPopulatedPrototypeUpgrade() {
   `)
 
   await db.exec(reconciliation)
+  await db.exec(commands)
 
   const active = await db.query('select count(*)::int as count from public.submissions')
   const archived = await db.query(

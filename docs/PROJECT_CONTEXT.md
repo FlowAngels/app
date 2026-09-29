@@ -47,6 +47,13 @@ Tim explicitly approved the live operation, and the migration was applied and
 verified on 2026-09-29. See `supabase/LIVE_AUDIT_2026-09-29.md` and
 `supabase/RECOVERY_RUNBOOK.md`.
 
+The next local security layer is also prepared but not deployed:
+`20260929020000_authenticated_commands.sql` adds anonymous-user ownership and
+transactional commands for room creation/joining, category choices, round
+start, answering, reveal, guessing, voting, and idempotent final scoring. Its
+rehearsal completes a three-player round and verifies the original scoring
+rules. It does not enable RLS or change the recovered client yet.
+
 ## Fidelity references
 
 - The nine prompts in `src/lib/prompts.ts` are Claude-generated placeholders,

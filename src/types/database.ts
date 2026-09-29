@@ -145,7 +145,52 @@ export type Database = {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      whatever_create_room: {
+        Args: { p_host_device_id: string }
+        Returns: string
+      }
+      whatever_join_room: {
+        Args: { p_room_id: string; p_name: string; p_avatar: string }
+        Returns: string
+      }
+      whatever_set_categories: {
+        Args: { p_player_id: string; p_categories: string[] }
+        Returns: Json
+      }
+      whatever_set_connected: {
+        Args: { p_player_id: string; p_connected: boolean }
+        Returns: undefined
+      }
+      whatever_start_round: {
+        Args: { p_room_id: string; p_category: string; p_prompt_text: string }
+        Returns: string
+      }
+      whatever_begin_round: {
+        Args: { p_round_id: string }
+        Returns: string
+      }
+      whatever_submit_answer: {
+        Args: { p_round_id: string; p_text: string }
+        Returns: string
+      }
+      whatever_reveal_round: {
+        Args: { p_round_id: string }
+        Returns: Json
+      }
+      whatever_set_guess: {
+        Args: { p_round_id: string; p_answer_id: string }
+        Returns: undefined
+      }
+      whatever_set_vote: {
+        Args: { p_round_id: string; p_answer_id: string }
+        Returns: undefined
+      }
+      whatever_finalize_round: {
+        Args: { p_round_id: string }
+        Returns: Json
+      }
+    }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
   }

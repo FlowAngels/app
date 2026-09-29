@@ -39,8 +39,10 @@ independent recovery sources after a successful commit.
 ## Approved live operation 2 — anonymous identity
 
 Do not enable anonymous sign-ins merely to make the current direct-write client
-work. First add authenticated command functions and RLS policies locally and
-rehearse them. Then, after Tim explicitly approves the project setting change:
+work. The authenticated command functions are now implemented and rehearsed in
+`20260929020000_authenticated_commands.sql`, but the client migration and RLS
+policies are not yet complete. After those remaining pieces are rehearsed and
+Tim explicitly approves the project setting change:
 
 1. Enable anonymous sign-ins in Supabase Auth.
 2. Verify a new browser session receives an anonymous user ID.
